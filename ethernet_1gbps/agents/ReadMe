@@ -1,0 +1,55 @@
+//This folder is intended to contain only UVM agent-related components used in the verification environment.
+
+//Purpose
+//The agents/ directory is used to organize all UVM agents in a structured and reusable manner. Each protocol or interface-specific agent should be placed in its own subfolder.
+
+//Recommended Structure
+//agents/
+// ├── ethernet_agent/
+// │    ├── ethernet_driver.sv
+// │    ├── ethernet_monitor.sv
+// │    ├── ethernet_sequencer.sv
+// │    ├── ethernet_sequence_item.sv
+// │    ├── ethernet_agent.sv
+// │    └── sequences/
+// │         ├── ethernet_base_seq.sv
+// │         └── ethernet_random_seq.sv
+// │
+// ├── apb_agent/
+// │    ├── apb_driver.sv
+// │    ├── apb_monitor.sv
+// │    ├── apb_sequencer.sv
+// │    ├── apb_sequence_item.sv
+// │    ├── apb_agent.sv
+// │    └── sequences/
+//Rules and Guidelines
+//Only UVM agent-related files should be placed inside this folder.
+//Every agent should contain:
+//   Driver
+//   Monitor
+//   Sequencer
+//   Sequence Item (Transaction)
+//   Agent class
+
+//Sequences should be organized inside a dedicated sequences/ folder.
+
+//Follow consistent naming conventions for all agent components.
+//Keep agents reusable and protocol-independent wherever possible.
+//Avoid placing environment, testbench top, scoreboard, or test files inside this directory.
+//Naming Convention
+//
+//Use protocol-based naming for clarity.
+//
+//Example:
+//
+//ethernet_driver.sv
+//ethernet_monitor.sv
+//ethernet_sequencer.sv
+//ethernet_sequence_item.sv
+
+//Objective
+//Maintaining a clean and consistent agent structure improves:
+//Readability
+//Reusability
+//Team collaboration
+//Ease of debugging and maintenance

@@ -1,0 +1,65 @@
+# Top Folder Guidelines
+
+This folder is intended to contain all top-level testbench components required to connect and run the UVM environment.
+
+## Purpose
+
+The `top/` directory contains the top-level SystemVerilog files used for simulation setup and environment integration. This includes interfaces, package files, and the main testbench top module.
+
+## Recommended Structure
+
+```text id="tpwmzi"
+top/
+ ├── interfaces/
+ │    ├── axi_if.sv
+ │    ├── apb_if.sv
+ │    └── clk_rst_if.sv
+ │
+ ├── packages/
+ │    ├── tb_pkg.sv
+ │    ├── agent_pkg.sv
+ │    └── env_pkg.sv
+ │
+ ├── top_tb.sv
+ └── filelist.f
+```
+
+## Rules and Guidelines
+
+* Only top-level testbench integration files should be placed inside this folder.
+* All interface files should be organized inside the `interfaces/` directory.
+* All package files should be organized inside the `packages/` directory.
+* `top_tb.sv` should instantiate:
+
+  * DUT
+  * Interfaces
+  * Clock and reset generation
+  * UVM configuration setup
+* Package files should contain:
+
+  * Class includes
+  * Type definitions
+  * Global parameters/macros
+  * UVM component registrations
+* Keep the top module clean and avoid placing unnecessary logic inside `top_tb.sv`.
+
+## Naming Convention
+
+Use consistent naming conventions for clarity.
+
+Examples:
+
+* `axi_if.sv`
+* `tb_pkg.sv`
+* `top_tb.sv`
+
+## Objective
+
+Maintaining a clean and organized top-level structure improves:
+
+* Testbench readability
+* Integration consistency
+* Simulation setup management
+* Reusability across projects
+* Ease of maintenance and debugging
+

@@ -1,0 +1,81 @@
+# Tests Folder Guidelines
+
+This folder is intended to contain all UVM test classes used to configure, control, and execute different verification scenarios.
+
+## Purpose
+
+The `tests/` directory is used to organize all testcases developed for validating DUT functionality under different configurations and stimulus conditions.
+
+Tests act as the top-level control layer of the UVM verification environment and are responsible for:
+
+* Configuring the environment
+* Starting sequences
+* Enabling/disabling features
+* Controlling simulation behavior
+
+## Recommended Structure
+
+```text id="ckfdlm"
+tests/
+ ├── base_test.sv
+ ├── smoke_tests/
+ │    ├── smoke_test.sv
+ │    └── sanity_test.sv
+ │
+ ├── directed_tests/
+ │    ├── write_read_test.sv
+ │    ├── reset_test.sv
+ │    └── burst_transfer_test.sv
+ │
+ ├── random_tests/
+ │    ├── random_test.sv
+ │    └── constrained_random_test.sv
+ │
+ ├── error_tests/
+ │    ├── protocol_error_test.sv
+ │    └── timeout_test.sv
+ │
+ └── test_pkg.sv
+```
+
+## Rules and Guidelines
+
+* Only UVM test-related files should be placed inside this folder.
+* All tests should extend:
+
+  * `uvm_test`
+  * or a project-specific `base_test`
+* Common environment setup should be implemented inside `base_test`.
+* Individual tests should focus only on testcase-specific configuration and sequence execution.
+* Tests should configure:
+
+  * Agent modes
+  * Environment settings
+  * Sequence selection
+  * Feature enable/disable controls
+* Avoid duplicating common setup code across multiple tests.
+
+## Naming Convention
+
+Use descriptive testcase-based naming conventions.
+
+Examples:
+
+* `base_test.sv`
+* `smoke_test.sv`
+* `reset_test.sv`
+* `random_test.sv`
+
+## Objective
+
+Maintaining a structured tests directory improves:
+
+* Testcase organization
+* Reusability
+* Scalability
+* Readability
+* Regression management
+* Ease of debugging and maintenance
+
+A well-organized test structure helps verification teams efficiently manage functional coverage, regression suites, and feature validation across different verification scenarios.
+

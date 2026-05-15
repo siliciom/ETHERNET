@@ -1,0 +1,56 @@
+# Config Folder Guidelines
+
+This folder is intended to contain all UVM configuration-related classes and files used for controlling and customizing the verification environment.
+
+## Purpose
+
+The `config/` directory is used to store configuration objects that control the behavior of agents, environments, tests, and other UVM components. These configuration classes help in making the testbench reusable, scalable, and flexible.
+
+## Recommended Structure
+
+```text id="ycopdz"
+config/
+ ├── agent_config.sv
+ ├── env_config.sv
+ ├── tb_config.sv
+ ├── scoreboard_config.sv
+ └── config_pkg.sv
+```
+
+## Rules and Guidelines
+
+* Only configuration-related files should be placed inside this folder.
+* Configuration classes should extend `uvm_object`.
+* Each major component should have its own dedicated configuration object.
+* Configuration objects should contain:
+
+  * Enable/disable controls
+  * Active/passive settings
+  * Virtual interface handles
+  * Address/data width parameters
+  * Feature control variables
+* Use configuration objects to pass settings through the UVM configuration database (`uvm_config_db`).
+* Avoid hardcoding configuration values inside agents, environments, or tests.
+
+## Naming Convention
+
+Use component-based naming conventions.
+
+Examples:
+
+* `agent_config.sv`
+* `env_config.sv`
+* `tb_config.sv`
+
+## Objective
+
+Maintaining a structured configuration directory improves:
+
+* Testbench flexibility
+* Reusability
+* Scalability
+* Configuration management
+* Ease of debugging and maintenance
+
+Using centralized configuration objects allows different tests and environments to be controlled without modifying the core verification components.
+

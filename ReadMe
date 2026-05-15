@@ -1,0 +1,22 @@
+# ETHERNET Development and Verification Workspace
+
+This repository provides a structured workspace for developing, verifying, and maintaining different ETHERNET protocol versions using a reusable UVM-based verification environment.
+
+The workspace is organized to support:
+
+* Multiple ETHERNET versions
+* Reusable UVM components
+* Regression management
+* Verification planning
+* Coverage and assertion tracking
+* Scalable verification architecture
+
+The repository structure is designed to improve:
+
+* Code organization
+* Reusability
+* Collaboration
+* Debugging efficiency
+* Regression automation
+* Long-term maintainability
+

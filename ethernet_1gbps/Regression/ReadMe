@@ -1,0 +1,86 @@
+# Regression Folder Guidelines
+
+This folder is intended to contain all regression-related files, scripts, and configuration data used for executing automated verification regressions.
+
+## Purpose
+
+The `regression/` directory is used to manage and organize regression execution infrastructure for the UVM verification environment.
+
+This includes:
+
+* Regression testlists
+* Run scripts
+* Simulation control scripts
+* Regression configuration files
+* Coverage merge scripts
+* Automation utilities
+
+The regression framework helps automate testcase execution and ensures consistent validation across multiple simulation runs.
+
+## Recommended Structure
+
+```text id="lgbmwu"
+regression/
+ ├── testlists/
+ │    ├── smoke_tests.list
+ │    ├── sanity_tests.list
+ │    └── full_regression.list
+ │
+ ├── scripts/
+ │    ├── run_regression.sh
+ │    ├── compile.sh
+ │    ├── run_test.sh
+ │    └── merge_coverage.sh
+ │
+ ├── configs/
+ │    ├── regression_cfg.yaml
+ │    └── simulator_cfg.f
+ │
+ ├── logs/
+ ├── reports/
+ ├── coverage/
+ └── README.md
+```
+
+## Rules and Guidelines
+
+* Only regression-related files and automation utilities should be placed inside this folder.
+* Testlists should clearly define:
+
+  * Test names
+  * Seed values
+  * Iteration counts
+  * Simulation options
+* Regression scripts should support:
+
+  * Batch execution
+  * Parallel simulation runs
+  * Log generation
+  * Coverage collection
+  * Report generation
+* Logs, reports, and coverage results should be organized into dedicated subdirectories.
+* Keep regression scripts reusable and simulator-independent whenever possible.
+
+## Naming Convention
+
+Use clear and functionality-based naming conventions.
+
+Examples:
+
+* `full_regression.list`
+* `run_regression.sh`
+* `merge_coverage.sh`
+* `regression_cfg.yaml`
+
+## Objective
+
+Maintaining a structured regression directory improves:
+
+* Automation efficiency
+* Regression management
+* Coverage tracking
+* Debugging and failure analysis
+* Scalability of verification flow
+
+A well-organized regression framework enables reliable and repeatable verification execution across multiple test scenarios and simulation environments.
+

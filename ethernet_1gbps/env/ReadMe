@@ -1,0 +1,62 @@
+# Environment Folder Guidelines
+
+This folder is intended to contain all UVM environment-related components used to build and connect the complete verification environment.
+
+## Purpose
+
+The `env/` directory is used to organize the top-level UVM environment and supporting verification components such as scoreboards, virtual sequencers, coverage collectors, and subscribers.
+
+The environment acts as the integration layer where all agents and verification components are instantiated and connected together.
+
+## Recommended Structure
+
+```text id="opltqu"
+env/
+ ├── uvm_env.sv
+ ├── virtual_sequencer.sv
+ ├── scoreboard.sv
+ ├── subscriber.sv
+ ├── env_pkg.sv
+ └── connections/
+      └── env_connect.sv
+```
+
+## Rules and Guidelines
+
+* Only environment-related components should be placed inside this folder.
+* The environment should instantiate and connect:
+
+  * Agents
+  * Scoreboards
+  * Coverage components
+  * Virtual sequencers
+  * Subscribers/checkers
+* All TLM connections should be managed inside the environment.
+* The environment should avoid protocol-specific implementation wherever possible to maintain reusability.
+* Scoreboards should contain checking and comparison logic.
+* Coverage components should collect functional coverage data.
+* Virtual sequencers should coordinate sequences across multiple agents.
+
+## Naming Convention
+
+Use clear and component-based naming conventions.
+
+Examples:
+
+* `uvm_env.sv`
+* `virtual_sequencer.sv`
+* `scoreboard.sv`
+* `coverage_collector.sv`
+
+## Objective
+
+Maintaining a structured environment directory improves:
+
+* Verification architecture clarity
+* Component integration
+* Reusability
+* Scalability
+* Debugging and maintenance
+
+A well-organized environment structure helps teams easily understand the interaction between different verification components and simplifies future enhancements.
+

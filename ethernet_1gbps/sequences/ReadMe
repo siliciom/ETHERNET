@@ -1,0 +1,68 @@
+# Sequences Folder Guidelines
+
+This folder is intended to contain all UVM sequence-related files used for generating stimulus in the verification environment.
+
+## Purpose
+
+The `sequences/` directory is used to organize all stimulus generation sequences for different agents and test scenarios. Sequences are responsible for creating and controlling transaction flow through the sequencer to the driver.
+
+## Recommended Structure
+
+```text id="jlwmrz"
+sequences/
+ ├── base_sequences/
+ │    ├── base_seq.sv
+ │    └── reset_seq.sv
+ │
+ ├── random_sequences/
+ │    ├── random_seq.sv
+ │    └── constrained_random_seq.sv
+ │
+ ├── directed_sequences/
+ │    ├── write_seq.sv
+ │    ├── read_seq.sv
+ │    └── burst_seq.sv
+ │
+ ├── virtual_sequences/
+ │    ├── virtual_base_seq.sv
+ │    └── system_virtual_seq.sv
+ │
+ └── sequence_pkg.sv
+```
+
+## Rules and Guidelines
+
+* Only UVM sequence-related files should be placed inside this folder.
+* All sequences should extend:
+
+  * `uvm_sequence`
+  * or a project-specific base sequence
+* Sequences should generate valid transaction objects (`sequence_item`).
+* Reusable/common functionality should be placed inside base sequences.
+* Separate random, directed, and virtual sequences into dedicated subfolders whenever possible.
+* Virtual sequences should coordinate multiple agent sequences through virtual sequencers.
+* Avoid placing protocol-independent utility logic inside sequence files.
+
+## Naming Convention
+
+Use descriptive and functionality-based naming conventions.
+
+Examples:
+
+* `base_seq.sv`
+* `random_seq.sv`
+* `write_seq.sv`
+* `system_virtual_seq.sv`
+
+## Objective
+
+Maintaining a structured sequences directory improves:
+
+* Stimulus organization
+* Reusability
+* Test scalability
+* Readability
+* Ease of debugging and maintenance
+
+A clean sequence hierarchy allows efficient creation of reusable verification scenarios and simplifies complex stimulus coordination across multiple agents.
+

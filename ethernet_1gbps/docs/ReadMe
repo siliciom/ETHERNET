@@ -1,0 +1,96 @@
+# Documentation Folder Guidelines
+
+This folder is intended to contain all project-related documentation required for design understanding, verification planning, testcase tracking, and project maintenance.
+
+## Purpose
+
+The `docs/` directory is used to organize all technical and verification documentation associated with the project.
+
+This includes:
+
+* Design specifications
+* Verification plans
+* Testcase plans
+* Coverage plans
+* Assertion plans
+* Version tracking documents
+
+Maintaining proper documentation ensures consistent verification methodology, easier collaboration, and long-term maintainability of the project.
+
+## Recommended Structure
+
+```text id="kqtdhk"
+docs/
+ ├── specs/
+ │    ├── design_spec.pdf
+ │    └── protocol_spec.pdf
+ │
+ ├── verification_plan/
+ │    ├── verification_plan.docx
+ │    └── verification_plan.pdf
+ │
+ ├── testcase_plan/
+ │    ├── testcase_plan.xlsx
+ │    ├── tb_architecture
+ │    └── block_diagram
+ │
+ └── README.md
+```
+
+## Testcase Plan Guidelines
+
+The `testcase_plan.xlsx` file should contain multiple sheets to organize verification tracking information clearly.
+
+### Recommended Excel Sheets
+
+| Sheet Name        | Description                                   |
+| ----------------- | --------------------------------------------- |
+| Testcases         | List of all planned and implemented testcases |
+| Coverage Plan     | Functional coverage goals and coverage points |
+| Assertion Plan    | Assertion definitions and verification checks |
+| Feature Mapping   | Mapping between DUT features and testcases    |
+| Regression Status | Pass/fail status tracking for regressions     |
+| Version History   | Document revision history and updates         |
+
+## Rules and Guidelines
+
+* Only project-related documentation should be placed inside this folder.
+* Specifications should be stored in read-only/reference format whenever possible.
+* Verification plans should clearly define:
+
+  * Verification scope
+  * Methodology
+  * Features to verify
+  * Coverage goals
+* Testcase plans should maintain traceability between:
+
+  * Specifications
+  * Features
+  * Assertions
+  * Coverage points
+  * Testcases
+* All documentation should follow version control practices and maintain revision history.
+
+## Naming Convention
+
+Use clear and descriptive naming conventions.
+
+Examples:
+
+* `design_spec.pdf`
+* `verification_plan.docx`
+* `testcase_plan.xlsx`
+
+## Objective
+
+Maintaining a structured documentation directory improves:
+
+* Requirement traceability
+* Verification planning
+* Team collaboration
+* Review efficiency
+* Project maintainability
+* Verification completeness tracking
+
+A well-organized documentation structure ensures that all verification activities remain aligned with design requirements and project goals.
+
