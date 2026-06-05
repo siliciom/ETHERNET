@@ -3,7 +3,7 @@ interface eth_ui_interface();
   // Tx Counters
   logic [31:0] tx_good_pkt_count;
   logic [31:0] tx_bad_pkt_count;
-  logic [31:0] tx_collison_count;
+  logic [31:0] tx_collision_count;
   logic [31:0] tx_unicast_count;
   logic [31:0] tx_multicast_count;
   logic [31:0] tx_broadcast_count;
@@ -16,10 +16,16 @@ interface eth_ui_interface();
   logic [31:0] tx_vlan_count;
   logic [31:0] tx_ipg_violation_count;
   logic [31:0] tx_pfc_count;
+  logic [31:0] tx_carrier_ext_count;
+  logic [31:0] tx_pause_xon_count; 
+  logic [31:0] tx_pause_xoff_count;
+  logic [31:0] tx_control_pkt_count;
+  
   
   //Rx Counters
   logic [31:0] rx_good_pkt_count;
   logic [31:0] rx_bad_pkt_count;
+  logic [31:0] rx_collision_count;
   logic [31:0] rx_unicast_count;
   logic [31:0] rx_multicast_count;
   logic [31:0] rx_broadcast_count;
@@ -33,6 +39,12 @@ interface eth_ui_interface();
   logic [31:0] rx_drop_count;
   logic [31:0] rx_ipg_violation_count;
   logic [31:0] rx_pfc_count;
+  logic [31:0] rx_carrier_ext_count;
+  logic [31:0] rx_pause_xon_count; 
+  logic [31:0] rx_pause_xoff_count;
+  logic [31:0] rx_control_pkt_count;
+  
   
 endinterface
+
 

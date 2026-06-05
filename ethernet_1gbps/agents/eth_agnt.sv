@@ -5,6 +5,8 @@ class eth_agnt extends uvm_agent;
   eth_drv drv_h;
   eth_mon mon_h;
   
+
+  
   function new(string name = "eth_agnt", uvm_component parent = null);
     super.new(name,parent);
   endfunction  
