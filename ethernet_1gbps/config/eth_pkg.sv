@@ -18,4 +18,5 @@
   `include "../env/eth_env.sv"
 
   `include "../sequences/eth_sequence.sv"
+  `include "../sequences/eth_virtual_seq.sv"
   `include "../tests/eth_base_test.sv"

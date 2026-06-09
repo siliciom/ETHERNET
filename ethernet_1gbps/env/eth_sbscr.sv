@@ -22,11 +22,9 @@ class eth_sbscr extends uvm_subscriber#(eth_seq_item);
   endfunction    
   
   function void write_ap_3(eth_seq_item t);
-    `uvm_info(get_type_name(), $sformatf("Expected TXD = %0h", t.data), UVM_LOW)       
   endfunction
 
   function void write_ap_4(eth_seq_item t);
-    `uvm_info(get_type_name(), $sformatf("Actual RXD = %0h", t.data), UVM_LOW)       
   endfunction
 
   function void write(eth_seq_item t);
