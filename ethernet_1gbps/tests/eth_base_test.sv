@@ -48,9 +48,6 @@ class gmii_eth_normal_frame_test extends eth_base_test;
     phase.raise_objection(this); 
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
-      vseq.padding_en = 1;
       vseq.start(env_h.vseqr_h);  
     end
     #100;
@@ -78,9 +75,7 @@ class gmii_eth_max_size_frame_test extends eth_base_test;
     phase.raise_objection(this);
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.ether_type = 1500;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);
     end
     #100;
@@ -109,9 +104,7 @@ class gmii_eth_min_size_frame_test extends eth_base_test;
 
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;  
       vseq.ether_type = 40;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -150,11 +143,8 @@ class gmii_eth_error_detection_test extends eth_base_test;
     vseq = virtual_seq::type_id::create("vseq");
     
     repeat(this.no_of_pkts) begin
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.err_b) with {vseq.err_b dist {0:=70, 1:=30};});
       if(vseq.err_b) vseq.err_offset = 50;  
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h); 
     end
     #100;
@@ -181,11 +171,7 @@ class gmii_eth_vlan_tag_frame_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.vlan_en = 1;
-      vseq.payload_rand_en = 1;
-      vseq.TPID = 16'h8100;  
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -211,18 +197,15 @@ class gmii_eth_preamble_corruption_test extends eth_base_test;
     virtual_seq vseq;
     // Demoting expected errors
     foreach(env_h.agnt_mac[i]) begin
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_PREAMBLE",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_PREAMBLE",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_PREAMBLE_ERR",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_PREAMBLE_ERR",UVM_WARNING);
     end
     phase.raise_objection(this);  
       
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");  
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.corrupt_preamble_en) with {vseq.corrupt_preamble_en dist {0:=70, 1:=30};});
-      if(vseq.corrupt_preamble_en) vseq.set_corpt_pkt = 3; // corrupting the third byte of the preamble
-      vseq.padding_en =1;
+      if(vseq.corrupt_preamble_en) vseq.set_corpt_pkt = $urandom_range(0,6); // corrupting any one byte of preamble
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -248,10 +231,8 @@ class gmii_eth_frame_with_ext_bit_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 0; //Carrier extension only for half-duplex
       vseq.payload_rand_en = 0;
       vseq.carr_ext_en = 1;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -279,12 +260,10 @@ class gmii_eth_runt_good_fcs_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.padding_en = 1;
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.runt_en) with {vseq.runt_en dist {0:=70, 1:=30};});
       if(vseq.runt_en) begin
 	vseq.payload_rand_en = 0;
+        vseq.ether_type = $urandom_range(0,45);
 	vseq.padding_en = 0;
       end
       vseq.start(env_h.vseqr_h);    
@@ -308,22 +287,19 @@ class gmii_eth_runt_bad_fcs_test extends eth_base_test;
   task run_phase(uvm_phase phase);
     virtual_seq vseq;
     foreach(env_h.agnt_mac[i]) begin
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_FRAGMENT",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_FRAGMENT",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_FRAGMENT_PKT",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_FRAGMENT_PKT",UVM_WARNING);
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"MON_PADDING_ERROR",UVM_WARNING);
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_FRAGMENT_CRC",UVM_WARNING);
     end
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
-      vseq.runt_en = 1;
       vseq.corrupt_fcs_en = 0;
-      vseq.padding_en =1;
       void'(std::randomize(vseq.runt_en) with {vseq.runt_en dist {0:=70, 1:=30};});
       if(vseq.runt_en) begin
 	vseq.payload_rand_en = 0;
+        vseq.ether_type = $urandom_range(0,45);
 	vseq.corrupt_fcs_en = 1;
 	vseq.padding_en = 0;
       end
@@ -349,16 +325,13 @@ class gmii_eth_bad_fcs_test extends eth_base_test;
   task run_phase(uvm_phase phase);
     virtual_seq vseq;
     foreach(env_h.agnt_mac[i]) begin
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_CRC",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_CRC_ERR",UVM_WARNING);
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_CRC_DROP",UVM_WARNING);
     end
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;     
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.corrupt_fcs_en) with {vseq.corrupt_fcs_en dist {0:=70, 1:=30};});
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -386,13 +359,10 @@ class gmii_eth_invalid_dest_addr_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.custom_da) with {vseq.custom_da dist {0:=70, 1:=30};});
       if(vseq.custom_da) begin
 	vseq.da = 48'h88_88_88_88_88_88;
       end
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -421,10 +391,8 @@ class gmii_eth_normal_frame_undefined_length_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.payload_rand_en = 0;
       void'(std::randomize(vseq.invld_length_en) with {vseq.invld_length_en dist {0:=70, 1:=30};});
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -451,10 +419,7 @@ class gmii_eth_collision_detect_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 0;
-      vseq.payload_rand_en = 1;
       vseq.coll_en = 1;  
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -484,10 +449,7 @@ class gmii_eth_ipg_violation_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
     vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.corrupt_ipg_en) with {vseq.corrupt_ipg_en dist {0:=70, 1:=30};});
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -512,16 +474,13 @@ class gmii_eth_len_payload_mismat_test extends eth_base_test;
     virtual_seq vseq;
     foreach(env_h.agnt_mac[i]) begin
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"MON_LEN_MISMATCH",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_LEN_MISMATCH",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_LEN",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_LEN_DATA_MISMATCH",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_LEN_DATA_MISMATCH",UVM_WARNING);
     end
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;      
-      vseq.payload_rand_en = 1;
       void'(std::randomize(vseq.len_payload_mismat_en) with {vseq.len_payload_mismat_en dist {0:=70, 1:=30};});
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -548,9 +507,7 @@ class gmii_eth_normal_payload_padding_test extends eth_base_test;
     phase.raise_objection(this);
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.ether_type = $urandom_range(0,45);
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);
     end
     #100;
@@ -576,12 +533,9 @@ class gmii_eth_vlan_payload_padding_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.vlan_en = 1;
       vseq.payload_rand_en = 0;
       vseq.ether_type = $urandom_range(0,41);
-      vseq.TPID = 16'h8100;  
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -608,7 +562,6 @@ class gmii_eth_pfc_frame_test extends eth_base_test;
     phase.raise_objection(this); 
    
     vseq = virtual_seq::type_id::create("vseq");
-    vseq.mode = 1;
     vseq.pfc_with_vlan_traffic =1;
     vseq.no_of_pkts = no_of_pkts;
     vseq.basic_pfc_en = 1;
@@ -641,11 +594,8 @@ class gmii_eth_collision_in_middle_bytes_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");    
-      vseq.mode = 0;
-      vseq.payload_rand_en = 1;
       vseq.coll_en = 1;  
       vseq.middle_coll_en = 1;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -671,12 +621,9 @@ class gmii_eth_broadcast_frame_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.broadcast_en = 1;
-      vseq.payload_rand_en = 1;
       vseq.custom_da = 1;
       vseq.da = 48'hFF_FF_FF_FF_FF_FF;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -700,16 +647,13 @@ class gmii_eth_jabber_frame_test extends eth_base_test;
   task run_phase(uvm_phase phase);
     virtual_seq vseq;
     foreach(env_h.agnt_mac[i]) begin
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_JABBER",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_JABBER",UVM_WARNING);
-      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_CRC",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_JABBER_PKT",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_JABBER_PKT",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_CRC_ERR",UVM_WARNING);
     end   
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
-      vseq.padding_en =1;
       void'(std::randomize(vseq.corrupt_fcs_en) with {vseq.corrupt_fcs_en dist {0:=70, 1:=30};});
       if(vseq.corrupt_fcs_en) begin
 	vseq.ether_type = $urandom_range(1536, 2000);
@@ -740,7 +684,6 @@ class gmii_eth_pause_frame_basic_xon_xoff_test extends eth_base_test;
 
     phase.raise_objection(this);          
     vseq = virtual_seq::type_id::create("vseq");
-    vseq.mode = 1;
     vseq.no_of_pkts = no_of_pkts;
     vseq.ether_type = 46;
     vseq.payload_rand_en = 0;
@@ -769,7 +712,6 @@ class gmii_eth_simultaneous_pause_frame_test extends eth_base_test;
 
     phase.raise_objection(this);          
     vseq = virtual_seq::type_id::create("vseq");
-    vseq.mode = 1;
     vseq.no_of_pkts = no_of_pkts;
     vseq.payload_rand_en = 0;
     vseq.ether_type = 46;
@@ -796,9 +738,7 @@ class gmii_eth_pause_reserved_opcode_test extends eth_base_test;
     virtual_seq vseq;
     phase.raise_objection(this); 
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
       vseq.no_of_pkts = no_of_pkts;
-      vseq.payload_rand_en = 1;
       vseq.pause_normal_traffic=1;
       vseq.pfc_with_vlan_traffic =0;
       vseq.pause_rsd_en=1;
@@ -822,7 +762,6 @@ class gmii_eth_pause_frame_with_upadated_pause_time extends eth_base_test;
     virtual_seq vseq;
     phase.raise_objection(this); 
     vseq = virtual_seq::type_id::create("vseq");
-    vseq.mode = 1;
     vseq.no_of_pkts = no_of_pkts;
     vseq.payload_rand_en = 0;
     vseq.ether_type=46;
@@ -851,16 +790,45 @@ class gmii_eth_multicast_frame_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
-      vseq.mode = 1;
-      vseq.payload_rand_en = 1;
       vseq.multicast_en = 1;
       vseq.custom_da = 1;
       vseq.da = 48'h01_50_40_30_20_10;
-      vseq.padding_en =1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
     phase.drop_objection(this);
   endtask    
   
+endclass
+
+class gmii_eth_pause_frame_during_vlan_traffic_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_pause_frame_during_vlan_traffic_test)
+ 
+  function new (string name = "gmii_eth_pause_frame_during_vlan_traffic_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+ 
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+ 
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+ 
+    phase.raise_objection(this);          
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.ether_type = 46;
+    vseq.payload_rand_en = 0;
+    vseq.pause_normal_traffic = 1;
+    vseq.vlan_en=1;
+    vseq.TPID =16'h8100;
+    vseq.vlan_pause_en=1;
+    vseq.normal_xon_xoff_en = 1;
+    vseq.start(env_h.vseqr_h);
+    phase.phase_done.set_drain_time(this,1000);
+    phase.drop_objection(this);
+ 
+  endtask    
 endclass

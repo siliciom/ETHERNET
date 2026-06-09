@@ -7,7 +7,7 @@ class base_virtual_seq extends uvm_sequence;
   bit [47:0] da;
   bit vlan_en;
   bit [15:0] TPID;
-  bit payload_rand_en;
+  bit payload_rand_en = 1;
   rand bit corrupt_preamble_en;
   bit multicast_en = 0;
   bit broadcast_en = 0;
@@ -27,7 +27,7 @@ class base_virtual_seq extends uvm_sequence;
   rand bit corrupt_ipg_en;
   int set_corpt_pkt;
   int error_pkt_no;
-  bit padding_en;
+  bit padding_en = 1;
   bit pfc_frame_en;   
   bit pfc_with_vlan_traffic;
   bit pause_normal_traffic ;
@@ -44,6 +44,7 @@ class base_virtual_seq extends uvm_sequence;
   bit pause_rsd_en;
   bit pause_update_time_en;
   bit middle_coll_en;
+  bit vlan_pause_en;
 
   function new (string name = "base_virtual_seq");
     super.new(name);
@@ -64,8 +65,14 @@ class virtual_seq extends base_virtual_seq;
     super.new(name);
   endfunction  
 
-  task body();
 
+  task body();
+    `ifdef HALF_DUPLEX
+       this.mode = 0;
+    `else
+       this.mode = 1;
+    `endif
+    $display("---------- MODE = %0d -----------",this.mode);
     if(!pause_normal_traffic && ! pfc_with_vlan_traffic) begin // This will work in default mode
 
       seq1 = gmii_eth_normal_frame_seq::type_id::create("seq1");
@@ -97,7 +104,7 @@ class virtual_seq extends base_virtual_seq;
 
     else begin
 
-      if(mode==1) begin
+      if(this.mode==1) begin
 
         //------------------pause, normal traffic--------------
 
@@ -135,7 +142,7 @@ class virtual_seq extends base_virtual_seq;
 	      end
  
 	      //pause_update_time
-	      else if(this.pause_update_time_en  && ($urandom_range(1,100)<6) ) begin
+	      else if(this.pause_update_time_en  && ($urandom_range(1,100)<20) ) begin
 		seq1.pause_sel =1;
 		seq1.pause_time=$urandom_range(1,10);
 	      end
@@ -147,6 +154,10 @@ class virtual_seq extends base_virtual_seq;
 		simul_pause_en2   = 1;
 		simul_pause_time2 = $urandom_range(1,10);
 	      end
+	      else if(this.vlan_pause_en && $urandom_range(1,100)<7) begin
+                seq1.pause_sel=1;
+                seq1.pause_time=$urandom_range(1,10);
+              end	      
 	      else     
 		seq1.pause_sel=0;
 	      seq1.start(p_sequencer.mac_seqr_h[0]);
@@ -227,7 +238,6 @@ class virtual_seq extends base_virtual_seq;
     seq.VID                 = this.VID;    
     seq.invld_length_en     = this.invld_length_en;
     seq.carr_ext_en         = this.carr_ext_en;
-    seq.runt_en		    = this.runt_en;
     seq.len_payload_mismat_en = this.len_payload_mismat_en; 
     seq.corrupt_ipg_en      = this.corrupt_ipg_en;
     seq.error_pkt_no        = this.error_pkt_no;

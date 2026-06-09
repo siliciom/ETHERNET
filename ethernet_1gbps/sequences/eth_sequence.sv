@@ -20,7 +20,6 @@ class base_seq extends uvm_sequence #(eth_seq_item);
   bit [11:0] VID;
   bit invld_length_en;
   bit carr_ext_en;
-  bit runt_en;
   bit send_runt;
   bit len_payload_mismat_en; 
   bit corrupt_ipg_en;
@@ -52,7 +51,6 @@ class gmii_eth_normal_frame_seq extends base_seq;
   task body();
     `uvm_info(get_type_name(), "gmii_eth_normal_frame_seq: Inside Body", UVM_LOW)
     
-    uvm_config_db#(bit)::set(null,"*","mode",mode);
     req = eth_seq_item::type_id::create("req");
     
     start_item(req);
@@ -66,9 +64,6 @@ class gmii_eth_normal_frame_seq extends base_seq;
     if(this.padding_en == 1)
       req.padding_en = 1;
     
-    //Runt Frame
-    if(this.runt_en == 1) 
-      c_ether_type = $urandom_range(0,45);
         
       // Complete frame fields from preamble to payload will be generated
       if(payload_rand_en == 1) 
@@ -147,8 +142,8 @@ class gmii_eth_normal_frame_seq extends base_seq;
       
       //CORRUPTED PREAMBLE
       if(this.corrupt_preamble_en == 1) begin
-          req.preamble[3] = 8'hFF;
-          `uvm_info("PREAMBLE CORRUPT", $sformatf("Sending Corrupted Preamble Packet, Transaction no = %0d",exact_pkt),UVM_LOW)
+          req.preamble[pkt_no] = 8'hFF;
+          `uvm_info("PREAMBLE CORRUPT", $sformatf("Sending Corrupted Preamble in Byte = %0d, Transaction no = %0d",pkt_no,exact_pkt),UVM_LOW)
       end
    
       //CORRUPT FCS

@@ -17,7 +17,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 } elseif {$testname == "gmii_eth_max_size_frame_test"} {
 
-    #set comp_opts "+define+HALF_DUPLEX"
+    #set comp_opts "+define+JUMBO_EN"
 
     #set run_opts "+PAUSE_EN=1 +NUM_PKTS=200"
 
@@ -47,7 +47,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 } elseif {$testname == "gmii_eth_frame_with_ext_bit_test"} {
 
-    #set comp_opts "+define+JUMBO_EN"
+    set comp_opts "+define+HALF_DUPLEX"
 
     #set run_opts "+PKT_SIZE=9000"
 
@@ -83,7 +83,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 } elseif {$testname == "gmii_eth_collision_detect_test"} {
 
-    #set comp_opts "+define+JUMBO_EN"
+    set comp_opts "+define+HALF_DUPLEX"
 
     #set run_opts "+PKT_SIZE=9000"
 
@@ -119,7 +119,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 } elseif {$testname == "gmii_eth_collision_in_middle_bytes_test"} {
 
-    #set comp_opts "+define+JUMBO_EN"
+    set comp_opts "+define+HALF_DUPLEX"
 
     #set run_opts "+PKT_SIZE=9000"
 
@@ -165,6 +165,12 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+PKT_SIZE=9000"
 
+} elseif {$testname == "gmii_eth_pause_frame_during_vlan_traffic_test"} {
+
+    #set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
 }
 
 
@@ -199,6 +205,7 @@ set valid_tests {
     gmii_eth_pause_reserved_opcode_test
     gmii_eth_pause_frame_with_upadated_pause_time
     gmii_eth_multicast_frame_test
+    gmii_eth_pause_frame_during_vlan_traffic_test
 }
 # ==========================================
 # Check whether test is valid

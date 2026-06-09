@@ -5,7 +5,7 @@ import uvm_pkg::*;
 module eth_top;
   bit clk;
   bit rst;
-  bit mode = 1;
+  bit mode;
    
   // Intermediate Signals---------------------------------------
   logic [7:0] txd   [`NO_OF_AGENTS];
@@ -78,11 +78,17 @@ module eth_top;
   initial begin
     mac_unicast(mac_uni);
     mac_multicast(mac_multi);
-    uvm_config_db#(bit)::wait_modified(null,"","mode");
-    if(!(uvm_config_db#(bit)::get(null,"","mode",mode)))
-      `uvm_info("UVM_TOP","MODE FAIL,Can't able to get mode", UVM_LOW);
   end
+
+  initial begin
+  `ifdef HALF_DUPLEX
+    mode = 0;
+  `else
+    mode = 1;
+  `endif
   
+    $display("mode = %0d", mode);
+  end
   // initializing the statistics virtual interface with mac addr
   generate
   for(i=0; i<`NO_OF_AGENTS; i++) begin
