@@ -155,12 +155,14 @@ set comp_status [catch {
 if {$comp_status != 0} {
 
     puts ""
+    puts "Compile Log : [file normalize $complog]"
+    
+    puts "\033\[31m"
     puts "================================="
     puts "     COMPILATION FAILED"
     puts "================================="
-    puts "Compile Log : [file normalize $complog]"
-    puts "================================="
-
+    puts "\033\[0m"
+    
     quit -f
 }
 
@@ -171,6 +173,7 @@ puts $fp "================================="
 puts $fp "COMPILE PASSED"
 puts $fp "Time : [clock format [clock seconds]]"
 puts $fp "================================="
+
 
 close $fp
 # ==========================================
