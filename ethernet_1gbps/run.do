@@ -11,39 +11,8 @@ set run_opts ""
 
 if {$testname == "gmii_eth_normal_frame_test"} {
 
-    #set comp_opts ""
 
     #set run_opts "+NO_OF_PKTS=200"
-
-} elseif {$testname == "gmii_eth_max_size_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PAUSE_EN=1 +NUM_PKTS=200"
-
-} elseif {$testname == "gmii_eth_min_size_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_error_detection_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_vlan_tag_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_preamble_corruption_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
 
 } elseif {$testname == "gmii_eth_frame_with_ext_bit_test"} {
 
@@ -51,69 +20,9 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+PKT_SIZE=9000"
 
-} elseif {$testname == "gmii_eth_runt_good_fcs_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_runt_bad_fcs_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_bad_fcs_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-}  elseif {$testname == "gmii_eth_invalid_dest_addr_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_normal_frame_undefined_length_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
 } elseif {$testname == "gmii_eth_collision_detect_test"} {
 
     set comp_opts "+define+HALF_DUPLEX"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_ipg_violation_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_len_payload_mismat_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_normal_payload_padding_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_vlan_payload_padding_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-}  elseif {$testname == "gmii_eth_pfc_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
 
     #set run_opts "+PKT_SIZE=9000"
 
@@ -129,50 +38,13 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+PKT_SIZE=9000"
 
-} elseif {$testname == "gmii_eth_jabber_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_pause_frame_basic_xon_xoff_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_simultaneous_pause_frame_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_pause_reserved_opcode_test"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_pause_frame_with_upadated_pause_time"} {
-
-    #set comp_opts "+define+JUMBO_EN"
-
-    #set run_opts "+PKT_SIZE=9000"
-
 } elseif {$testname == "gmii_eth_multicast_frame_test"} {
 
-    #set comp_opts "+define+NO_OF_AGENTS=4"
-
-    #set run_opts "+PKT_SIZE=9000"
-
-} elseif {$testname == "gmii_eth_pause_frame_during_vlan_traffic_test"} {
-
-    #set comp_opts "+define+NO_OF_AGENTS=4"
+    set comp_opts "+define+NO_OF_AGENTS=4"
 
     #set run_opts "+PKT_SIZE=9000"
 
 }
-
 
 # ==========================================
 # Valid Tests
