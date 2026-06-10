@@ -84,7 +84,8 @@ class eth_seq_item extends uvm_sequence_item;
   constraint payload_size {payload.size() == ether_type;}
   
   constraint addr{ da inside {mac_addr};};
-  constraint sa_da_not_match{ da != sa ;}
+  constraint sa_da_not_match{ da != sa ;};
+  constraint vlan_tpid{ vlan_en == 1 -> TPID == 16'h8100;};
 
 endclass
 

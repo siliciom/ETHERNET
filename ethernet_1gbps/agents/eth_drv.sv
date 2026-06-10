@@ -1,3 +1,4 @@
+`define v_if v_intf.DRV_MP.drv_cb
 class eth_drv extends uvm_driver#(eth_seq_item);
   `uvm_component_utils(eth_drv);
   eth_seq_item tr;
@@ -32,7 +33,7 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     else
       `uvm_info(get_type_name(),"CONNECTION_PASSED",UVM_LOW) 
       
-    PAUSE_QUANTA_CYCLES = (512 / $bits(v_intf.TXD));   
+    PAUSE_QUANTA_CYCLES = (512 / $bits(`v_if.TXD));   
   
   endfunction    
   
@@ -72,9 +73,9 @@ class eth_drv extends uvm_driver#(eth_seq_item);
 
       while(local_pause_cycles > 0 ) begin
         @(posedge v_intf.TX_CLK);
-        v_intf.TX_EN <= 0;
-        v_intf.TXD   <= 0;
-        v_intf.TX_ER <= 0;
+        `v_if.TX_EN <= 0;
+        `v_if.TXD   <= 0;
+        `v_if.TX_ER <= 0;
         if(statistics::pause_update[mac_addr]) begin
           prev_pause_value = statistics::pause_value[mac_addr];
           local_pause_cycles = prev_pause_value * PAUSE_QUANTA_CYCLES;
@@ -130,18 +131,18 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   endtask
 
   task drive_reset();
-    v_intf.TXD    <= 0;
-    v_intf.TX_ER  <= 0;
-    v_intf.TX_EN  <= 0;
+    `v_if.TXD    <= 0;
+    `v_if.TX_ER  <= 0;
+    `v_if.TX_EN  <= 0;
   endtask
     
   task carrier_ext();
     if(tr.mode == 0 && tr.carr_ext_en == 1 && idx < 512) begin
       for(int i = idx; i < 512; i++) begin
         @(posedge v_intf.TX_CLK);         
-        v_intf.TX_EN <= 0;      
-        v_intf.TXD   <= 8'h0F;
-        v_intf.TX_ER <= 1;
+        `v_if.TX_EN <= 0;      
+        `v_if.TXD   <= 8'h0F;
+        `v_if.TX_ER <= 1;
 	idx++;	
       end
       `uvm_info("CARR_EXT",$sformatf("Sending Carrer Extension for %0d bytes",idx),UVM_LOW);
@@ -160,10 +161,10 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   task drive_tx_frame(eth_seq_item tr);
     pfc_check(tr);
     frame_in_progress=1;
-    if(!mode) wait(!v_intf.CRS);
+    if(!mode) wait(!`v_if.CRS);
     for (int j = 0; j < idx; j++) begin
       @(posedge v_intf.TX_CLK); 
-      if(v_intf.COL == 1) begin
+      if(`v_if.COL == 1) begin
         frame_q.delete();
         collision_detect = 1;
         break;
@@ -173,12 +174,12 @@ class eth_drv extends uvm_driver#(eth_seq_item);
       if(j==0)
 	pfc_check(tr);	
 
-      v_intf.TX_EN <= 1;      
-      v_intf.TXD   <= frame_q.pop_front();
-      v_intf.TX_ER <= 0;
+      `v_if.TX_EN <= 1;      
+      `v_if.TXD   <= frame_q.pop_front();
+      `v_if.TX_ER <= 0;
 
       if(tr.err_b == 1 && j >= tr.err_offset) begin
-        v_intf.TX_ER <= 1;
+        `v_if.TX_ER <= 1;
       end    
     end
       
@@ -199,18 +200,18 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     //Driving IPG
     for(int j = 0;j < tr.ipg_cnt; j++) begin  //8 bits wide * 12 clock = 96-bit times
       @(posedge v_intf.TX_CLK);
-      v_intf.TXD   <= 0;
-      v_intf.TX_EN <= 0;
-      v_intf.TX_ER <= 0;      
+      `v_if.TXD   <= 0;
+      `v_if.TX_EN <= 0;
+      `v_if.TX_ER <= 0;      
     end
     frame_in_progress =0;  
   endtask    
     
   task send_jam_signal();
     for(int i = 0; i < 4;i++) begin //Sending 32-bit jam signal                 
-      v_intf.TX_EN <= 1;      
-      v_intf.TXD   <= 8'hFF; //Jam Pattern
-      v_intf.TX_ER <= 0;    
+      `v_if.TX_EN <= 1;      
+      `v_if.TXD   <= 8'hFF; //Jam Pattern
+      `v_if.TX_ER <= 0;    
       @(posedge v_intf.TX_CLK);
     end
     drive_reset();
