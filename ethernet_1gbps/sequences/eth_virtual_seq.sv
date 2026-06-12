@@ -20,7 +20,6 @@ class base_virtual_seq extends uvm_sequence;
   rand bit custom_da;
   bit [11:0] VID;
   rand bit invld_length_en;
-  bit carr_ext_en;
   rand bit runt_en;
   bit coll_en;
   rand bit len_payload_mismat_en;   
@@ -45,6 +44,10 @@ class base_virtual_seq extends uvm_sequence;
   bit pause_update_time_en;
   bit middle_coll_en;
   bit vlan_pause_en;
+  bit max_coll_en;
+  int constant_rand_slot;
+  bit late_coll_en;
+  bit burst_en;
 
   function new (string name = "base_virtual_seq");
     super.new(name);
@@ -237,12 +240,16 @@ class virtual_seq extends base_virtual_seq;
     seq.da                  = this.da;
     seq.VID                 = this.VID;    
     seq.invld_length_en     = this.invld_length_en;
-    seq.carr_ext_en         = this.carr_ext_en;
     seq.len_payload_mismat_en = this.len_payload_mismat_en; 
     seq.corrupt_ipg_en      = this.corrupt_ipg_en;
     seq.error_pkt_no        = this.error_pkt_no;
     seq.padding_en          = this.padding_en;
     seq.pause_rsd_en        = this.pause_rsd_en;
+    seq.middle_coll_en      = this.middle_coll_en;
+    seq.max_coll_en         = this.max_coll_en;
+    seq.constant_rand_slot  = this.constant_rand_slot;
+    seq.late_coll_en        = this.late_coll_en;
+    seq.burst_en            = this.burst_en;
 
   endtask   
 

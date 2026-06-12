@@ -55,6 +55,7 @@ class eth_mon extends uvm_monitor;
     bit bad_preamble_tx;
     bit tx_er_seen;
     bit len_mismatch_tx;
+    bit tx_late_collision;
     bit carrier_ext_seen;
     int carrier_ext_cnt;
     bit pkt_bad;
@@ -72,11 +73,13 @@ class eth_mon extends uvm_monitor;
       da_match             = 0;
       byte_cnt             = 0;
       invalid_ethertype_tx = 0;
+      tx_late_collision    = 0;
       bad_preamble_tx      = 0;
       bad_sfd_tx 	   = 0;
       tx_er_seen           = 0;
       len_mismatch_tx      = 0;
       pkt_bad              = 0;
+      carrier_ext_seen     = 0;
 
       if(`v_inf.TX_EN) begin
 	if(tx_ipg_violation_count < `IPG_COUNT) begin
@@ -90,8 +93,11 @@ class eth_mon extends uvm_monitor;
 	//
 	//DETECTNG COLLISION
 	while(`v_inf.TX_EN) begin
-	  if(`v_inf.COL)
-	  collision_seen=1;
+	  if(`v_inf.COL) begin
+	    collision_seen=1;
+	    if(byte_cnt > 64)
+	      tx_late_collision =1;
+	  end
         //--------------------------------------------
         // TX_ER
         //--------------------------------------------
@@ -143,7 +149,7 @@ class eth_mon extends uvm_monitor;
       // CREATE TR
       //------------------------------------------------
       tr = eth_seq_item::type_id::create("tr", this);
-      if(!collision_seen) tx_pkt_count++;
+      if(!collision_seen || tx_late_collision) tx_pkt_count++;
       tr.tx_count=tx_pkt_count;
 
       //------------------------------------------------
@@ -180,7 +186,11 @@ class eth_mon extends uvm_monitor;
       // COLLISION
       //------------------------------------------------
 
-      if(collision_seen) begin
+      if(tx_late_collision) begin
+	statistics::v_uif[mac_addr].tx_collision_count++;
+        `uvm_info("TX_LATE_COLLISION",$sformatf("late collision detected byte_cnt=%0d",byte_cnt),UVM_LOW)	  
+      end
+      else if(collision_seen) begin
 	statistics::v_uif[mac_addr].tx_collision_count++;
 	half_duplex = 1;
         `uvm_info("TX_COLLISION_DETECTED",$sformatf("Collision detected frame_size=%0d",tx_frame_q.size()),UVM_LOW)
@@ -298,7 +308,7 @@ class eth_mon extends uvm_monitor;
           statistics::v_uif[mac_addr].tx_pause_xon_count++;
         else
      	  statistics::v_uif[mac_addr].tx_pause_xoff_count++;
-      	  `uvm_info("RX_PAUSE_BLOCK",$sformatf("pause_frame_en=%0d ether_type=%h pause_opc=%h pause_time=%0d", 
+      	  `uvm_info("TX_PAUSE_BLOCK",$sformatf("pause_frame_en=%0d ether_type=%h pause_opc=%h pause_time=%0d", 
 		  tr.pause_frame_en,tr.ether_type,tr.pause_opc,tr.pause_time),UVM_LOW)
        	  continue;
       	end
@@ -308,18 +318,18 @@ class eth_mon extends uvm_monitor;
       	  statistics::v_uif[mac_addr].tx_pfc_count++;
       	  statistics::v_uif[mac_addr].tx_good_pkt_count++;
       	  //addr_classify_tx(tr);
-      	  `uvm_info("RX_PFC_BLOCK","PFC frame blocked from scoreboard",UVM_LOW)
+      	  `uvm_info("TX_PFC_BLOCK","PFC frame blocked from scoreboard",UVM_LOW)
       	  continue;
       	end
       	else if(tr.ether_type == 16'h8808 &&
       	  tr.pause_opc != 16'h0001 &&
       	  tr.pause_opc != 16'h0101) begin
       	  statistics::v_uif[mac_addr].tx_control_pkt_count++;
-      	  `uvm_info("RX_CONTROL",$sformatf("Unknown control packet opcode=%h sent to scoreboard",tr.pause_opc),UVM_LOW)
+      	  `uvm_info("TX_CONTROL",$sformatf("Unknown control packet opcode=%h sent to scoreboard",tr.pause_opc),UVM_LOW)
       	end
       	else begin
-      	  `uvm_info("RX_NORMAL_PKT","RX packet",UVM_LOW)
-      	end    
+      	  `uvm_info("TX_NORMAL_PKT","RX packet",UVM_LOW)
+      	end   
       	//------------------------------------------------
       	// WRITE ALWAYS
       	//------------------------------------------------
@@ -356,6 +366,7 @@ class eth_mon extends uvm_monitor;
     bit bad_sfd;
     bit rx_er_seen;
     bit collision_seen_rx;
+    bit rx_late_collision;
     time last_pause_rx_time;
     bit [15:0] active_pause_time;
     bit len_mismatch_rx;
@@ -379,6 +390,7 @@ class eth_mon extends uvm_monitor;
       bad_sfd  = 0;
       rx_er_seen        = 0;
       invalid_ethertype=0;
+      rx_carrier_ext_seen = 0;
 
       if(`v_inf.RX_DV) begin
        	if(rx_ipg_violation_count < `IPG_COUNT) begin
@@ -427,14 +439,17 @@ class eth_mon extends uvm_monitor;
 	`uvm_info("RX_CARRIER_EXT",$sformatf("Carrier extension bytes=%0d",rx_carrier_ext_count),UVM_LOW)
       end
       
-      if(`v_inf.COL)
+      if(`v_inf.COL) begin
         collision_seen_rx=1;
+	if(byte_cnt>64)
+	  rx_late_collision = 1;
+      end
 
       //------------------------------------------------
       // create transaction
       //------------------------------------------------
       tr = eth_seq_item::type_id::create("tr", this);
-      if(!`v_inf.COL)
+      if(!`v_inf.COL || rx_late_collision)
        	rx_pkt_count++;
       tr.rx_count=rx_pkt_count;
       tr.agt_addr=mac_addr;
@@ -468,7 +483,7 @@ class eth_mon extends uvm_monitor;
       //------------------------------------------------
       // COLLISION
       //------------------------------------------------
-      if(collision_seen_rx) begin
+      if(collision_seen_rx && !rx_late_collision) begin
 	half_duplex = 1;
         `uvm_info("RX_COLLISION",$sformatf("Collision detected frame_size=%0d",rx_frame_q.size()),UVM_LOW)
          continue;
@@ -542,7 +557,7 @@ class eth_mon extends uvm_monitor;
       if(tr.payload.size()>1536) begin
        	if(crc_ok) begin
       	   statistics::v_uif[mac_addr].rx_jumbo_count++;
-      	   addr_classify_rx(tr);
+      	   //addr_classify_rx(tr);
       	   `uvm_info("RX_JUMBO_PKT",$sformatf("Jumbo detected payload=%0d",tr.payload.size()),UVM_LOW)
       	end
       	else begin
@@ -600,6 +615,8 @@ class eth_mon extends uvm_monitor;
       else begin
        	`uvm_info("RX_NORMAL_PKT","RX packet",UVM_LOW)
       end    
+      if(rx_late_collision) 
+        `uvm_info("RX_LATE_COLLISION",$sformatf("late collision detected byte_cnt=%0d",byte_cnt),UVM_LOW)	  
       if(tr.payload.size() > 9000) begin
        	statistics::v_uif[mac_addr].rx_super_jumbo_count++;
       end

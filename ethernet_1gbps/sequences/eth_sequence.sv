@@ -19,7 +19,6 @@ class base_seq extends uvm_sequence #(eth_seq_item);
   bit custom_da;
   bit [11:0] VID;
   bit invld_length_en;
-  bit carr_ext_en;
   bit send_runt;
   bit len_payload_mismat_en; 
   bit corrupt_ipg_en;
@@ -32,6 +31,12 @@ class base_seq extends uvm_sequence #(eth_seq_item);
   bit pause_sel;
   bit pfc_sel;  
   bit pause_rsd_en;
+  bit middle_coll_en;
+  bit max_coll_en;
+  int constant_rand_slot;
+  int coll_byte;
+  bit late_coll_en;
+  bit burst_en;
   
   function new (string name = "base_seq");
     super.new(name);
@@ -64,7 +69,7 @@ class gmii_eth_normal_frame_seq extends base_seq;
     if(this.padding_en == 1)
       req.padding_en = 1;
     
-        
+
       // Complete frame fields from preamble to payload will be generated
       if(payload_rand_en == 1) 
         req.randomize() with {sa == p_sequencer.mac_addr;};   
@@ -73,7 +78,14 @@ class gmii_eth_normal_frame_seq extends base_seq;
                               ether_type == c_ether_type;};  
 
       req.mode = mode;
-      req.carr_ext_en = carr_ext_en;
+      req.middle_coll_en = middle_coll_en;
+      req.max_coll_en = max_coll_en;
+      req.constant_rand_slot = constant_rand_slot;
+      req.late_coll_en = late_coll_en;
+      req.burst_en = burst_en;
+      if(late_coll_en) begin
+        req.coll_byte = ($urandom_range(req.ether_type, 46)) + 22;
+      end
       
       if(custom_da)
         req.da=da;   
