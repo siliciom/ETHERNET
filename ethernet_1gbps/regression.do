@@ -21,6 +21,7 @@ set test_list {
     gmii_eth_error_detection_test
     gmii_eth_vlan_tag_frame_test
     gmii_eth_preamble_corruption_test
+    gmii_eth_frame_with_ext_bit_test
     gmii_eth_runt_good_fcs_test
     gmii_eth_runt_bad_fcs_test
     gmii_eth_bad_fcs_test
@@ -31,7 +32,6 @@ set test_list {
     gmii_eth_len_payload_mismat_test
     gmii_eth_normal_payload_padding_test
     gmii_eth_vlan_payload_padding_test
-    gmii_eth_broadcast_frame_test
     gmii_eth_jabber_frame_test
     gmii_eth_pause_frame_basic_xon_xoff_test
     gmii_eth_simultaneous_pause_frame_test
@@ -40,7 +40,7 @@ set test_list {
     gmii_eth_multicast_frame_test
 
     }
- 
+
 #========================================================
 # DIRECTORIES
 #========================================================
@@ -85,7 +85,6 @@ proc check_result {logfile testname} {
     }
 }
  
- 
 #========================================================
 # REGRESSION LOOP
 #========================================================
@@ -93,8 +92,42 @@ set pass_count 0
 set fail_count 0
 set fail_list {}
  
-set last_mode ""
+set last_comp_opts "__NONE__" 
 foreach testname $test_list {
+
+# ==========================================
+# Default Compile/Run Switches
+# ==========================================
+set comp_opts ""
+set run_opts ""
+
+# ==========================================
+# Test Specific Switches
+# ==========================================
+
+if {$testname == "gmii_eth_normal_frame_test"} {
+
+
+    #set run_opts "+NO_OF_PKTS=200"
+
+} elseif {$testname == "gmii_eth_multicast_frame_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_collision_detect_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+}
+
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : $comp_opts"
+    puts "RUN_OPTS  : $run_opts" 
+ 
  
     echo "======================================="
     echo "RUNNING TEST : $testname"
@@ -103,11 +136,27 @@ foreach testname $test_list {
 #====================================================
 # COMPILE
 #====================================================
-# Compile ONLY if mode changes
-            vlog -work work -cover bsectf +fcover -sv -incr -mfcu \
+if {$comp_opts ne $last_comp_opts} {
+
+    puts "================================="
+    puts "COMPILING"
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : <$comp_opts>"
+    puts "================================="
+
+            eval vlog -work work -cover bsectf +fcover -sv -incr -mfcu \
                 top/eth_gmii_interface.sv \
                 top/eth_ui_interface.sv \
                 top/eth_top.sv \
+    		$comp_opts 
+		set last_comp_opts $comp_opts
+} else {
+    puts "================================="
+    puts "SKIPPING COMPILE"
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : <$comp_opts>"
+    puts "================================="
+}
  
  
 set ucdb_file "coverage_reports/${testname}.ucdb"
@@ -124,6 +173,7 @@ set ucdb_file "coverage_reports/${testname}.ucdb"
         work.eth_top \
         +UVM_TESTNAME=$testname \
         -l Regression/${testname}.log \
+	$run_opts \
         -do "add log -r /*; coverage save -onexit $ucdb_file; run -all; quit -f"
           catch {eval exec $sim_cmd} sim_result
  
