@@ -6,7 +6,7 @@ set comp_opts ""
 set run_opts ""
 
 # ==========================================
-# Test Specific Switches
+# Test Specific Switches (Use the below method if any tests have comp or run options)
 # ==========================================
 
 if {$testname == "gmii_eth_normal_frame_test"} {
@@ -140,14 +140,27 @@ puts "Compile Switches : $comp_opts"
 puts "Run Switches     : $run_opts"
 puts "================================="
 
+#=========================================
+# Seed Handling
+#=========================================
+if {![info exists seed]} {
+    set seed 1
+}
+
+
 # ==========================================
 # Log/Wave files
 # ==========================================
-file mkdir sim/$testname
-set logfile "./sim/$testname/${testname}.log"
-set wavefile "./sim/$testname/${testname}.wlf"
-set qwavefile "./sim/$testname/qwave.db"
-set complog "./sim/$testname/comp.log"
+file mkdir sim/$testname/seed_$seed
+set complog "./sim/$testname/seed_$seed/comp.log"
+set logfile "./sim/$testname/seed_$seed/${testname}.log"
+set qwavefile "./sim/$testname/seed_$seed/qwave.db"
+set wavefile "./sim/$testname/seed_$seed/${testname}.wlf"
+
+
+puts "================================="
+puts "Seed : $seed"
+puts "================================="
 
 # ==========================================
 # Library
@@ -199,7 +212,7 @@ close $fp
 # Simulation
 # ==========================================
 
-eval vsim -debugDB -voptargs=+acc work.eth_top +UVM_TESTNAME=$testname +UVM_VERBOSITY=UVM_LOW $run_opts -l $logfile -qwavedb=+wavefile=$qwavefile
+eval vsim -debugDB -voptargs=+acc work.eth_top +UVM_TESTNAME=$testname +UVM_VERBOSITY=UVM_LOW $run_opts -l $logfile -qwavedb=+wavefile=$qwavefile -sv_seed $seed
 # ==========================================
 # Logging
 # ==========================================
@@ -263,3 +276,5 @@ if {[regexp {UVM_ERROR :\s+[1-9]} $log_data] || \
 } 
 quit -f
 
+# Run Command: 		  vsim -c -do "set testname gmii_eth_normal_frame_test; do run.do"
+# Run Command with Seed:  vsim -c -do "set testname gmii_eth_normal_frame_test; set seed 123; do run.do"
