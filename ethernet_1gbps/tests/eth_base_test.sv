@@ -232,7 +232,6 @@ class gmii_eth_frame_with_ext_bit_test extends eth_base_test;
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");
       vseq.payload_rand_en = 0;
-      vseq.carr_ext_en = 1;
       vseq.start(env_h.vseqr_h);    
     end
     #100;
@@ -594,7 +593,7 @@ class gmii_eth_collision_in_middle_bytes_test extends eth_base_test;
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
       vseq = virtual_seq::type_id::create("vseq");    
-      vseq.coll_en = 1;  
+      vseq.coll_en = 1;
       vseq.middle_coll_en = 1;
       vseq.start(env_h.vseqr_h);    
     end
@@ -831,4 +830,137 @@ class gmii_eth_pause_frame_during_vlan_traffic_test extends eth_base_test;
     phase.drop_objection(this);
  
   endtask    
+endclass
+
+class gmii_eth_max_collision_attempt_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_max_collision_attempt_test)
+  
+  function new (string name = "gmii_eth_max_collision_attempt_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this);  
+    repeat(this.no_of_pkts) begin
+      vseq = virtual_seq::type_id::create("vseq");    
+      vseq.mode = 0;
+      vseq.payload_rand_en = 1;
+      vseq.padding_en =1;
+      void'(std::randomize(vseq.max_coll_en) with { vseq.max_coll_en dist {0 := 70, 1 := 30}; });
+      if(vseq.max_coll_en) begin
+	`uvm_info("Max Collision", "Setting Excessive Collision Occurence",UVM_LOW)
+        vseq.coll_en = 1;  
+        vseq.constant_rand_slot = 3; //Same randomized slot time to acheive the maximum collision
+      end
+      vseq.start(env_h.vseqr_h);    
+    end
+    #100;
+    phase.drop_objection(this);
+  endtask    
+  
+endclass
+
+
+class gmii_eth_late_collision_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_late_collision_test)
+  
+  function new (string name = "gmii_eth_late_collision_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this);  
+    repeat(this.no_of_pkts) begin
+      vseq = virtual_seq::type_id::create("vseq");    
+      vseq.mode = 0;
+      vseq.payload_rand_en = 1;
+      vseq.padding_en =1;
+      void'(std::randomize(vseq.late_coll_en) with { vseq.late_coll_en dist {0 := 70, 1 := 30}; });
+      if(vseq.late_coll_en) begin
+	`uvm_info("Late Collision", "Setting Late Collision Occurence",UVM_LOW);
+      end
+      vseq.start(env_h.vseqr_h);    
+    end
+    #100;
+    phase.drop_objection(this);
+  endtask    
+  
+endclass
+
+
+class gmii_eth_long_frame_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_long_frame_test)
+  
+  function new (string name = "gmii_eth_long_frame_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    bit send_long_pkt;
+    virtual_seq vseq;
+    foreach(env_h.agnt_mac[i]) begin
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_JABBER_PKT",UVM_WARNING);
+      env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_JABBER_PKT",UVM_WARNING);
+    end   
+    phase.raise_objection(this);  
+    repeat(this.no_of_pkts) begin
+      vseq = virtual_seq::type_id::create("vseq");
+      void'(std::randomize(send_long_pkt) with {send_long_pkt dist {0:=70, 1:=30};});
+      if(send_long_pkt) begin
+	`uvm_info("LONG FRAME", "Sending Long Frame",UVM_LOW)
+	vseq.ether_type = $urandom_range(1536, 2000);
+	vseq.payload_rand_en = 0;
+      end
+      vseq.start(env_h.vseqr_h);    
+    end
+    #100;
+    phase.drop_objection(this);
+  endtask    
+  
+endclass
+
+
+class gmii_eth_frame_bursting_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_frame_bursting_test)
+  
+  function new (string name = "gmii_eth_frame_bursting_test", uvm_component parent = null);
+    super.new(name, parent);
+  endfunction
+  
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction  
+
+    
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this); 
+    repeat(this.no_of_pkts) begin
+      vseq = virtual_seq::type_id::create("vseq");
+      vseq.burst_en = 1;
+      vseq.payload_rand_en = 0;
+      vseq.ether_type = 46;
+      vseq.start(env_h.vseqr_h);  
+    end
+    #100;
+    phase.drop_objection(this);
+  endtask  
+
 endclass

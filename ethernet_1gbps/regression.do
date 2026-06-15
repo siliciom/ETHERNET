@@ -38,6 +38,11 @@ set test_list {
     gmii_eth_pause_reserved_opcode_test
     gmii_eth_pause_frame_with_upadated_pause_time
     gmii_eth_multicast_frame_test
+    gmii_eth_collision_in_middle_bytes_test
+    gmii_eth_max_collision_attempt_test
+    gmii_eth_late_collision_test
+    gmii_eth_long_frame_test
+    gmii_eth_frame_bursting_test
 
     }
 
@@ -110,9 +115,9 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+NO_OF_PKTS=200"
 
-} elseif {$testname == "gmii_eth_multicast_frame_test"} {
+} elseif {$testname == "gmii_eth_frame_with_ext_bit_test"} {
 
-    set comp_opts "+define+NO_OF_AGENTS=4"
+    set comp_opts "+define+HALF_DUPLEX"
 
     #set run_opts "+PKT_SIZE=9000"
 
@@ -122,7 +127,42 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+PKT_SIZE=9000"
 
+} elseif {$testname == "gmii_eth_collision_in_middle_bytes_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+}  elseif {$testname == "gmii_eth_broadcast_frame_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_multicast_frame_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_max_collision_attempt_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_late_collision_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_frame_bursting_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
 }
+
 
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
@@ -260,3 +300,4 @@ echo "======================================="
 echo "REGRESSION COMPLETED"
 echo "======================================="
 quit -f
+

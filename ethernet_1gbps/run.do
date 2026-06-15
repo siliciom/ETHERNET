@@ -44,8 +44,23 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     #set run_opts "+PKT_SIZE=9000"
 
-}
+} elseif {$testname == "gmii_eth_max_collision_attempt_test"} {
 
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_late_collision_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_frame_bursting_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+}
 # ==========================================
 # Valid Tests
 # ==========================================
@@ -78,6 +93,10 @@ set valid_tests {
     gmii_eth_pause_frame_with_upadated_pause_time
     gmii_eth_multicast_frame_test
     gmii_eth_pause_frame_during_vlan_traffic_test
+    gmii_eth_max_collision_attempt_test
+    gmii_eth_late_collision_test
+    gmii_eth_long_frame_test
+    gmii_eth_frame_bursting_test
 }
 # ==========================================
 # Check whether test is valid
@@ -168,12 +187,14 @@ set comp_status [catch {
 if {$comp_status != 0} {
 
     puts ""
+    puts "Compile Log : [file normalize $complog]"
+    
+    puts "\033\[31m"
     puts "================================="
     puts "     COMPILATION FAILED"
     puts "================================="
-    puts "Compile Log : [file normalize $complog]"
-    puts "================================="
-
+    puts "\033\[0m"
+    
     quit -f
 }
 
@@ -184,6 +205,7 @@ puts $fp "================================="
 puts $fp "COMPILE PASSED"
 puts $fp "Time : [clock format [clock seconds]]"
 puts $fp "================================="
+
 
 close $fp
 # ==========================================
