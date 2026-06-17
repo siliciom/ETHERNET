@@ -20,6 +20,8 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   int pad_cnt;
   bit frame_in_progress = 0;
   int PAUSE_QUANTA_CYCLES;
+  bit mid_en;
+  bit first_pkt;
  
   function new(string name = "eth_drv", uvm_component parent = null);
     super.new(name,parent);
@@ -137,7 +139,7 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   endtask
     
   task carrier_ext();
-    if(tr.mode == 0 && tr.carr_ext_en == 1 && idx < 512) begin
+    if(tr.mode == 0 && idx < 512) begin
       for(int i = idx; i < 512; i++) begin
         @(posedge v_intf.TX_CLK);         
         `v_if.TX_EN <= 0;      
@@ -159,17 +161,29 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   endtask    
     
   task drive_tx_frame(eth_seq_item tr);
+    int k;
+
     pfc_check(tr);
     frame_in_progress=1;
-    if(!mode) wait(!`v_if.CRS);
+
+    if(!mode && tr.middle_coll_en && !mid_en) mid_en = 1; 
+    else if(!mode) wait(!`v_if.CRS);
+
     for (int j = 0; j < idx; j++) begin
       @(posedge v_intf.TX_CLK); 
-      if(`v_if.COL == 1) begin
+      if(j >= 8) begin
+	k = j-8;
+        if(tr.late_coll_en && k == tr.coll_byte && collision_detect == 0) begin
+          v_intf.COL <= 1;
+          `uvm_info("Late collision", $sformatf("Late collision in byte = %0d", k), UVM_LOW)
+        end else
+	  v_intf.COL <= 0;	
+      end
+      if(`v_if.COL == 1 && k < 64) begin
         frame_q.delete();
         collision_detect = 1;
         break;
-      end
-      else
+      end else
 	collision_detect = 0;
       if(j==0)
 	pfc_check(tr);	
@@ -182,6 +196,7 @@ class eth_drv extends uvm_driver#(eth_seq_item);
         `v_if.TX_ER <= 1;
       end    
     end
+    v_intf.COL <= 0;      
       
     if(collision_detect == 1) begin
       send_jam_signal();
@@ -195,18 +210,23 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     end
 
     //Adding Carrier Extension if it is less than 512 bytes
-    if(!tr.mode) carrier_ext();
+    if(!tr.mode && !first_pkt) carrier_ext();
+    if(!tr.mode && tr.burst_en && first_pkt == 0) first_pkt = 1;
     
     //Driving IPG
+    send_ipg();
+    frame_in_progress =0;  
+  endtask    
+
+  task send_ipg();
     for(int j = 0;j < tr.ipg_cnt; j++) begin  //8 bits wide * 12 clock = 96-bit times
       @(posedge v_intf.TX_CLK);
       `v_if.TXD   <= 0;
       `v_if.TX_EN <= 0;
       `v_if.TX_ER <= 0;      
     end
-    frame_in_progress =0;  
-  endtask    
-    
+  endtask  
+
   task send_jam_signal();
     for(int i = 0; i < 4;i++) begin //Sending 32-bit jam signal                 
       `v_if.TX_EN <= 1;      
@@ -261,14 +281,14 @@ class eth_drv extends uvm_driver#(eth_seq_item);
 
     // Wait for backoff time
     #(backoff_time);
-    if(!rand_slot)
-      #(tr.ipg_cnt*8);
+    send_ipg();
     frame_q = retry_q;
     drive_tx_frame(tr);
    
   endtask
     
   task frame_pack(ref eth_seq_item tr);
+    mid_en = 0;
     idx = 0;
     //Preamble packing
     foreach(tr.preamble[i])

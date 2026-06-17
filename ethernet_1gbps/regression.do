@@ -17,8 +17,6 @@ if {![info exists regression_name]} {
 #========================================================
 set test_list {
 
-# Here add the Tests which doesn't have any compile Time switches
-
     gmii_eth_normal_frame_test
     gmii_eth_max_size_frame_test
     gmii_eth_min_size_frame_test
@@ -41,7 +39,6 @@ set test_list {
     gmii_eth_pause_frame_with_upadated_pause_time
     gmii_eth_long_frame_test
 
-# Here add the Tests which have Compile Time Switches
 
     gmii_eth_frame_with_ext_bit_test
     gmii_eth_frame_bursting_test
@@ -169,6 +166,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
     set comp_opts "+define+HALF_DUPLEX"
 
 }
+
 
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
@@ -325,7 +323,6 @@ echo "======================================="
 echo "REGRESSION COMPLETED"
 echo "======================================="
 quit -f
-
 
 
 #======================================================================================================
