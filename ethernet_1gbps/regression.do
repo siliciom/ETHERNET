@@ -4,30 +4,30 @@
 if {[file exists work]} {
     vdel -all
 }
- 
+
 #========================================================
-# LIBRARY
+# To pass Regression Name from the Command Line
 #========================================================
-vlib work
-vmap work work
+if {![info exists regression_name]} {
+    set regression_name "default_regression"
+}
  
 #========================================================
 # TEST LIST
 #========================================================
 set test_list {
+
     gmii_eth_normal_frame_test
     gmii_eth_max_size_frame_test
     gmii_eth_min_size_frame_test
     gmii_eth_error_detection_test
     gmii_eth_vlan_tag_frame_test
     gmii_eth_preamble_corruption_test
-    gmii_eth_frame_with_ext_bit_test
     gmii_eth_runt_good_fcs_test
     gmii_eth_runt_bad_fcs_test
     gmii_eth_bad_fcs_test
     gmii_eth_invalid_dest_addr_test
     gmii_eth_normal_frame_undefined_length_test
-    gmii_eth_collision_detect_test
     gmii_eth_ipg_violation_test
     gmii_eth_len_payload_mismat_test
     gmii_eth_normal_payload_padding_test
@@ -37,55 +37,53 @@ set test_list {
     gmii_eth_simultaneous_pause_frame_test
     gmii_eth_pause_reserved_opcode_test
     gmii_eth_pause_frame_with_upadated_pause_time
-    gmii_eth_multicast_frame_test
+    gmii_eth_long_frame_test
+
+
+    gmii_eth_frame_with_ext_bit_test
+    gmii_eth_frame_bursting_test
+    gmii_eth_collision_detect_test
     gmii_eth_collision_in_middle_bytes_test
     gmii_eth_max_collision_attempt_test
     gmii_eth_late_collision_test
-    gmii_eth_long_frame_test
-    gmii_eth_frame_bursting_test
-
+    gmii_eth_multicast_frame_test
+    gmii_eth_broadcast_frame_test
     }
 
-#========================================================
-# DIRECTORIES
-#========================================================
-file mkdir Regression
-file mkdir coverage_reports
- 
+
 #========================================================
 # PASS / FAIL VARIABLES
 #========================================================
 proc check_result {logfile testname} {
- 
-    # Check log file exists
+
     if {![file exists $logfile]} {
-        echo "❌ FAILED : $testname (log file not found)"
+        puts "FAILED : $testname (log file not found)"
         return "FAIL"
     }
- 
+
     set fh [open $logfile r]
     set content [read $fh]
     close $fh
- 
+
     set fatal_count 0
     set error_count 0
- 
+
     foreach line [split $content "\n"] {
- 
-        if {[regexp {Number of FATAL reports\s*:\s*(\d+)} $line match count]} {
+
+        if {[regexp {Number of FATAL reports\s*:\s*(\d+)} $line -> count]} {
             set fatal_count $count
         }
- 
-        if {[regexp {Number of ERROR reports\s*:\s*(\d+)} $line match count]} {
+
+        if {[regexp {Number of ERROR reports\s*:\s*(\d+)} $line -> count]} {
             set error_count $count
         }
     }
- 
+
     if {$fatal_count == 0 && $error_count == 0} {
-        echo "✅ PASSED : $testname"
+        puts "PASSED : $testname"
         return "PASS"
     } else {
-        echo "❌ FAILED : $testname (FATAL=$fatal_count ERROR=$error_count)"
+        puts "FAILED : $testname (FATAL=$fatal_count ERROR=$error_count)"
         return "FAIL"
     }
 }
@@ -99,6 +97,12 @@ set fail_list {}
  
 set last_comp_opts "__NONE__" 
 foreach testname $test_list {
+
+#=========================================
+# Seed Handling
+#=========================================
+set seed [expr {int(rand()*1000000)}]
+
 
 # ==========================================
 # Default Compile/Run Switches
@@ -163,7 +167,6 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 }
 
-
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
     puts "RUN_OPTS  : $run_opts" 
@@ -173,6 +176,13 @@ if {$testname == "gmii_eth_normal_frame_test"} {
     echo "RUNNING TEST : $testname"
     echo "======================================="
     # UCDB FILE NAME
+
+set test_dir "./Regression/$regression_name/$testname"
+file mkdir $test_dir
+set logfile "$test_dir/run.log"
+set complog "$test_dir/comp.log"
+
+
 #====================================================
 # COMPILE
 #====================================================
@@ -199,28 +209,32 @@ if {$comp_opts ne $last_comp_opts} {
 }
  
  
-set ucdb_file "coverage_reports/${testname}.ucdb"
+set cov_dir "./coverage_reports/$regression_name"
+file mkdir $cov_dir
+set ucdb_file "$cov_dir/$testname.ucdb"
  
     #====================================================
     # SIMULATION COMMAND
     #====================================================
+catch {
     exec vsim -c \
         -coverage \
         -cvgperinstance \
         -debugDB \
         -batch \
-         +acc \
+        +acc \
         work.eth_top \
         +UVM_TESTNAME=$testname \
-        -l Regression/${testname}.log \
-	$run_opts \
-        -do "add log -r /*; coverage save -onexit $ucdb_file; run -all; quit -f"
-          catch {eval exec $sim_cmd} sim_result
+        -l $logfile \
+        -sv_seed $seed \
+        $run_opts \
+        -do "coverage save -onexit $ucdb_file; run -all; quit -f"
+} sim_result
  
    #====================================================
     # CHECK PASS / FAIL
     #====================================================
-    set result [check_result Regression/${testname}.log $testname]
+    set result [check_result $logfile $testname]
  
     if {$result == "PASS"} {
         incr pass_count
@@ -238,7 +252,7 @@ set ucdb_file "coverage_reports/${testname}.ucdb"
 echo "======================================="
 echo "GENERATED COVERAGE FILES"
 echo "======================================="
-set ucdb_files [glob -nocomplain coverage_reports/*.ucdb]
+set ucdb_files [glob -nocomplain coverage_reports/*/*.ucdb]
  
 if {[llength $ucdb_files] == 0} {
     echo "❌ NO UCDB FILES FOUND"
@@ -255,14 +269,15 @@ echo "======================================="
 echo "MERGING COVERAGE DATABASES"
 echo "======================================="
  
-set ucdb_files [glob -nocomplain coverage_reports/*.ucdb]
-set ucdb_files [lsearch -all -inline -not $ucdb_files "coverage_reports/merged_cov.ucdb"]
+set ucdb_files [glob -nocomplain ./coverage_reports/$regression_name/*.ucdb]
+set ucdb_files [lsearch -all -inline -not $ucdb_files "coverage_reports/*/merged_cov.ucdb"]
  
 if {[llength $ucdb_files] == 0} {
     echo "❌ NO UCDB FILES TO MERGE"
 } else {
-    eval vcover merge coverage_reports/merged_cov.ucdb $ucdb_files
-}
+set merged_ucdb "./coverage_reports/$regression_name/merged_coverage.ucdb"
+
+eval vcover merge $merged_ucdb $ucdb_files}
  
 #========================================================
 # GENERATE COVERAGE REPORT
@@ -271,8 +286,15 @@ echo "======================================="
 echo "GENERATING COVERAGE REPORT"
 echo "======================================="
  
-vcover report -details -html coverage_reports/merged_cov.ucdb
- 
+set html_dir "./covhtmlreport/$regression_name/html"
+
+file mkdir $html_dir
+
+vcover report \
+    -details \
+    -html \
+    $merged_ucdb \
+    -output $html_dir 
 #========================================================
 # FINAL REGRESSION SUMMARY
 #========================================================
@@ -300,4 +322,20 @@ echo "======================================="
 echo "REGRESSION COMPLETED"
 echo "======================================="
 quit -f
+
+
+
+#======================================================================================================
+#======================================================================================================
+
+# Regression Run Command: vsim -c -do .\regression.do
+# Regression Run Command with regr_name:  vsim -c -do "set regression_name march_regr; do regression.do"
+
+# Logs Path: Regression/regression_name/test_name/run.log
+# Single Coverage Path: coverage_reports/regression_name/test_name.ucdb
+# Merged Coverage Path: coverage_reports/regression_name/merged_coverage.ucdb
+# HTML Coverage Path: covhtmlreport\regression_name/html
+
+#======================================================================================================
+#======================================================================================================
 
