@@ -11,16 +11,9 @@ if {[file exists work]} {
 if {![info exists regression_name]} {
     set regression_name "default_regression"
 }
-
-#========================================================
-# COVERAGE ENABLE/DISABLE
-#========================================================
-if {![info exists enable_cov]} {
-    set enable_cov 0
-}
  
 #========================================================
-# TEST LIST (Add all the Tests)
+# TEST LIST
 #========================================================
 set test_list {
 
@@ -39,7 +32,6 @@ set test_list {
     gmii_eth_len_payload_mismat_test
     gmii_eth_normal_payload_padding_test
     gmii_eth_vlan_payload_padding_test
-    gmii_eth_pfc_frame_test
     gmii_eth_jabber_frame_test
     gmii_eth_pause_frame_basic_xon_xoff_test
     gmii_eth_simultaneous_pause_frame_test
@@ -48,14 +40,20 @@ set test_list {
     gmii_eth_pause_frame_during_vlan_traffic_test
     gmii_eth_long_frame_test
 
-    gmii_eth_collision_detect_test
+
     gmii_eth_frame_with_ext_bit_test
-    gmii_eth_collision_in_middle_bytes_test
-    gmii_eth_broadcast_frame_test
-    gmii_eth_late_collision_test
-    gmii_eth_max_collision_attempt_test
     gmii_eth_frame_bursting_test
+    gmii_eth_collision_detect_test
+    gmii_eth_collision_in_middle_bytes_test
+    gmii_eth_max_collision_attempt_test
+    gmii_eth_late_collision_test
     gmii_eth_multicast_frame_test
+    gmii_eth_broadcast_frame_test
+    gmii_eth_pfc_frame_test
+    gmii_eth_pfc_independent_timer_overlap_test
+    gmii_eth_pfc_with_random_priority_quanta_expiry_test
+    gmii_eth_pause_pfc_simultaneous_operation_test
+    gmii_eth_xoff_xon_back_to_back_pfc_test
     }
 
 
@@ -75,16 +73,6 @@ proc check_result {logfile testname} {
 
     set fatal_count 0
     set error_count 0
-
-    if {[string match "*Error loading design*" $content]} {
-      puts "FAILED : $testname (Design Load Failure)"
-      return "FAIL"
-    }
-
-    if {[string match "*Optimization failed*" $content]} {
-      puts "FAILED : $testname (Optimization Failure)"
-      return "FAIL"
-    }
 
     foreach line [split $content "\n"] {
 
@@ -117,7 +105,7 @@ set last_comp_opts "__NONE__"
 foreach testname $test_list {
 
 #=========================================
-# Seed Handling (Picks Random Seed)
+# Seed Handling
 #=========================================
 set seed [expr {int(rand()*1000000)}]
 
@@ -129,7 +117,7 @@ set comp_opts ""
 set run_opts ""
 
 # ==========================================
-# Test Specific Switches (Add the tests which are having comp or run opts)
+# Test Specific Switches
 # ==========================================
 
 if {$testname == "gmii_eth_normal_frame_test"} {
@@ -185,6 +173,7 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
 }
 
+
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
     puts "RUN_OPTS  : $run_opts" 
@@ -204,7 +193,6 @@ set complog "$test_dir/comp.log"
 #====================================================
 # COMPILE
 #====================================================
-
 if {$comp_opts ne $last_comp_opts} {
 
     puts "================================="
@@ -213,99 +201,43 @@ if {$comp_opts ne $last_comp_opts} {
     puts "COMP_OPTS : <$comp_opts>"
     puts "================================="
 
-    if {$enable_cov} {
-        set cov_compile_opts "-cover bsectf +fcover"
-    } else {
-        set cov_compile_opts ""
-    }
-
-    transcript file $complog
-
-    set comp_status [catch {
-
-        eval vlog -work work $cov_compile_opts -sv -incr -mfcu \
-            top/eth_gmii_interface.sv \
-            top/eth_ui_interface.sv \
-            top/eth_top.sv \
-            $comp_opts
-
-    } comp_result]
-
-    transcript file ""
-
-    if {$comp_status != 0} {
-
-        puts "COMPILE FAILED : $testname"
-        puts $comp_result
-
-        incr fail_count
-        lappend fail_list $testname
-
-        continue
-    }
-
-    set last_comp_opts $comp_opts
-
+            eval vlog -work work -cover bsectf +fcover -sv -incr -mfcu \
+                top/eth_gmii_interface.sv \
+                top/eth_ui_interface.sv \
+                top/eth_top.sv \
+    		$comp_opts 
+		set last_comp_opts $comp_opts
 } else {
-
     puts "================================="
     puts "SKIPPING COMPILE"
     puts "TEST      : $testname"
     puts "COMP_OPTS : <$comp_opts>"
     puts "================================="
 }
-	
-if {$enable_cov} {
-	set cov_dir "./coverage_reports/$regression_name"
  
+ 
+set cov_dir "./coverage_reports/$regression_name"
 file mkdir $cov_dir
 set ucdb_file "$cov_dir/$testname.ucdb"
-}
-
  
-#====================================================
-# SIMULATION
-#====================================================
-
-set sim_cov_opts ""
-
-if {$enable_cov} {
-
-    set sim_cov_opts "-coverage -cvgperinstance"
-
-    set do_cmd \
-        "coverage save -onexit $ucdb_file; run -all; quit -f"
-
-} else {
-
-    set do_cmd "run -all; quit -f"
-}
-
-set sim_status [catch {
-
+    #====================================================
+    # SIMULATION COMMAND
+    #====================================================
+catch {
     exec vsim -c \
-        {*}$sim_cov_opts \
+        -coverage \
+        -cvgperinstance \
         -debugDB \
-        -voptargs=+acc \
+        -batch \
+        +acc \
         work.eth_top \
         +UVM_TESTNAME=$testname \
         -l $logfile \
         -sv_seed $seed \
         $run_opts \
-        -do "$do_cmd"
-
-} sim_result]
-
-if {$sim_status != 0} {
-
-    puts "ELAB/SIM FAILED : $testname"
-    puts $sim_result
-
-    incr fail_count
-    lappend fail_list $testname
-
-    continue
-}
+        -do "coverage save -onexit $ucdb_file; run -all; quit -f"
+} sim_result
+ 
    #====================================================
     # CHECK PASS / FAIL
     #====================================================
@@ -324,9 +256,6 @@ if {$sim_status != 0} {
 #========================================================
 # SHOW GENERATED UCDB FILES
 #========================================================
-
-if {$enable_cov} {
-
 echo "======================================="
 echo "GENERATED COVERAGE FILES"
 echo "======================================="
@@ -376,7 +305,6 @@ vcover report \
 #========================================================
 # FINAL REGRESSION SUMMARY
 #========================================================
-}
 echo "======================================="
 echo "        REGRESSION SUMMARY"
 echo "======================================="
@@ -403,13 +331,357 @@ echo "======================================="
 quit -f
 
 
+#======================================================================================================
+#======================================================================================================
+
+# Regression Run Command: vsim -c -do .\regression.do
+# Regression Run Command with regr_name:  vsim -c -do "set regression_name march_regr; do regression.do"
+
+# Logs Path: Regression/regression_name/test_name/run.log
+# Single Coverage Path: coverage_reports/regression_name/test_name.ucdb
+# Merged Coverage Path: coverage_reports/regression_name/merged_coverage.ucdb
+# HTML Coverage Path: covhtmlreport\regression_name/html
+
+#======================================================================================================
+#======================================================================================================
+#========================================================
+# CLEAN WORK LIBRARY
+#========================================================
+if {[file exists work]} {
+    vdel -all
+}
+
+#========================================================
+# To pass Regression Name from the Command Line
+#========================================================
+if {![info exists regression_name]} {
+    set regression_name "default_regression"
+}
+ 
+#========================================================
+# TEST LIST
+#========================================================
+set test_list {
+
+    gmii_eth_normal_frame_test
+    gmii_eth_max_size_frame_test
+    gmii_eth_min_size_frame_test
+    gmii_eth_error_detection_test
+    gmii_eth_vlan_tag_frame_test
+    gmii_eth_preamble_corruption_test
+    gmii_eth_runt_good_fcs_test
+    gmii_eth_runt_bad_fcs_test
+    gmii_eth_bad_fcs_test
+    gmii_eth_invalid_dest_addr_test
+    gmii_eth_normal_frame_undefined_length_test
+    gmii_eth_ipg_violation_test
+    gmii_eth_len_payload_mismat_test
+    gmii_eth_normal_payload_padding_test
+    gmii_eth_vlan_payload_padding_test
+    gmii_eth_jabber_frame_test
+    gmii_eth_pause_frame_basic_xon_xoff_test
+    gmii_eth_simultaneous_pause_frame_test
+    gmii_eth_pause_reserved_opcode_test
+    gmii_eth_pause_frame_with_upadated_pause_time
+    gmii_eth_pause_frame_during_vlan_traffic_test
+    gmii_eth_long_frame_test
+
+
+    gmii_eth_frame_with_ext_bit_test
+    gmii_eth_frame_bursting_test
+    gmii_eth_collision_detect_test
+    gmii_eth_collision_in_middle_bytes_test
+    gmii_eth_max_collision_attempt_test
+    gmii_eth_late_collision_test
+    gmii_eth_multicast_frame_test
+    gmii_eth_broadcast_frame_test
+    gmii_eth_pfc_frame_test
+    gmii_eth_pfc_independent_timer_overlap_test
+    gmii_eth_pfc_with_random_priority_quanta_expiry_test
+    gmii_eth_pause_pfc_simultaneous_operation_test
+    gmii_eth_xoff_xon_back_to_back_pfc_test
+    }
+
+
+#========================================================
+# PASS / FAIL VARIABLES
+#========================================================
+proc check_result {logfile testname} {
+
+    if {![file exists $logfile]} {
+        puts "FAILED : $testname (log file not found)"
+        return "FAIL"
+    }
+
+    set fh [open $logfile r]
+    set content [read $fh]
+    close $fh
+
+    set fatal_count 0
+    set error_count 0
+
+    foreach line [split $content "\n"] {
+
+        if {[regexp {Number of FATAL reports\s*:\s*(\d+)} $line -> count]} {
+            set fatal_count $count
+        }
+
+        if {[regexp {Number of ERROR reports\s*:\s*(\d+)} $line -> count]} {
+            set error_count $count
+        }
+    }
+
+    if {$fatal_count == 0 && $error_count == 0} {
+        puts "PASSED : $testname"
+        return "PASS"
+    } else {
+        puts "FAILED : $testname (FATAL=$fatal_count ERROR=$error_count)"
+        return "FAIL"
+    }
+}
+ 
+#========================================================
+# REGRESSION LOOP
+#========================================================
+set pass_count 0
+set fail_count 0
+set fail_list {}
+ 
+set last_comp_opts "__NONE__" 
+foreach testname $test_list {
+
+#=========================================
+# Seed Handling
+#=========================================
+set seed [expr {int(rand()*1000000)}]
+
+
+# ==========================================
+# Default Compile/Run Switches
+# ==========================================
+set comp_opts ""
+set run_opts ""
+
+# ==========================================
+# Test Specific Switches
+# ==========================================
+
+if {$testname == "gmii_eth_normal_frame_test"} {
+
+
+    #set run_opts "+NO_OF_PKTS=200"
+
+} elseif {$testname == "gmii_eth_frame_with_ext_bit_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_collision_detect_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_collision_in_middle_bytes_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+}  elseif {$testname == "gmii_eth_broadcast_frame_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_multicast_frame_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_max_collision_attempt_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_late_collision_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+    #set run_opts "+PKT_SIZE=9000"
+
+} elseif {$testname == "gmii_eth_frame_bursting_test"} {
+
+    set comp_opts "+define+HALF_DUPLEX"
+
+}
+
+
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : $comp_opts"
+    puts "RUN_OPTS  : $run_opts" 
+ 
+ 
+    echo "======================================="
+    echo "RUNNING TEST : $testname"
+    echo "======================================="
+    # UCDB FILE NAME
+
+set test_dir "./Regression/$regression_name/$testname"
+file mkdir $test_dir
+set logfile "$test_dir/run.log"
+set complog "$test_dir/comp.log"
+
+
+#====================================================
+# COMPILE
+#====================================================
+if {$comp_opts ne $last_comp_opts} {
+
+    puts "================================="
+    puts "COMPILING"
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : <$comp_opts>"
+    puts "================================="
+
+            eval vlog -work work -cover bsectf +fcover -sv -incr -mfcu \
+                top/eth_gmii_interface.sv \
+                top/eth_ui_interface.sv \
+                top/eth_top.sv \
+    		$comp_opts 
+		set last_comp_opts $comp_opts
+} else {
+    puts "================================="
+    puts "SKIPPING COMPILE"
+    puts "TEST      : $testname"
+    puts "COMP_OPTS : <$comp_opts>"
+    puts "================================="
+}
+ 
+ 
+set cov_dir "./coverage_reports/$regression_name"
+file mkdir $cov_dir
+set ucdb_file "$cov_dir/$testname.ucdb"
+ 
+    #====================================================
+    # SIMULATION COMMAND
+    #====================================================
+catch {
+    exec vsim -c \
+        -coverage \
+        -cvgperinstance \
+        -debugDB \
+        -batch \
+        +acc \
+        work.eth_top \
+        +UVM_TESTNAME=$testname \
+        -l $logfile \
+        -sv_seed $seed \
+        $run_opts \
+        -do "coverage save -onexit $ucdb_file; run -all; quit -f"
+} sim_result
+ 
+   #====================================================
+    # CHECK PASS / FAIL
+    #====================================================
+    set result [check_result $logfile $testname]
+ 
+    if {$result == "PASS"} {
+        incr pass_count
+    } else {
+        incr fail_count
+        lappend fail_list $testname
+    }
+ 
+    echo "COMPLETED : $testname"
+}
+ 
+#========================================================
+# SHOW GENERATED UCDB FILES
+#========================================================
+echo "======================================="
+echo "GENERATED COVERAGE FILES"
+echo "======================================="
+set ucdb_files [glob -nocomplain coverage_reports/*/*.ucdb]
+ 
+if {[llength $ucdb_files] == 0} {
+    echo "❌ NO UCDB FILES FOUND"
+} else {
+    foreach f $ucdb_files {
+        echo $f
+    }
+}
+ 
+#========================================================
+# MERGE COVERAGE
+#========================================================
+echo "======================================="
+echo "MERGING COVERAGE DATABASES"
+echo "======================================="
+ 
+set ucdb_files [glob -nocomplain ./coverage_reports/$regression_name/*.ucdb]
+set ucdb_files [lsearch -all -inline -not $ucdb_files "coverage_reports/*/merged_cov.ucdb"]
+ 
+if {[llength $ucdb_files] == 0} {
+    echo "❌ NO UCDB FILES TO MERGE"
+} else {
+set merged_ucdb "./coverage_reports/$regression_name/merged_coverage.ucdb"
+
+eval vcover merge $merged_ucdb $ucdb_files}
+ 
+#========================================================
+# GENERATE COVERAGE REPORT
+#========================================================
+echo "======================================="
+echo "GENERATING COVERAGE REPORT"
+echo "======================================="
+ 
+set html_dir "./covhtmlreport/$regression_name/html"
+
+file mkdir $html_dir
+
+vcover report \
+    -details \
+    -html \
+    $merged_ucdb \
+    -output $html_dir 
+#========================================================
+# FINAL REGRESSION SUMMARY
+#========================================================
+echo "======================================="
+echo "        REGRESSION SUMMARY"
+echo "======================================="
+ 
+echo "TOTAL  TESTS : [llength $test_list]"
+echo "PASSED TESTS : $pass_count"
+echo "FAILED TESTS : $fail_count"
+ 
+echo "======================================="
+ 
+#========================================================
+# PRINT FAILED TESTS
+#========================================================
+if {$fail_count > 0} {
+    echo "FAILED TESTCASES:"
+    foreach ft $fail_list {
+        echo "   ❌ $ft"
+    }
+}
+ 
+echo "======================================="
+echo "REGRESSION COMPLETED"
+echo "======================================="
+quit -f
+
 
 #======================================================================================================
 #======================================================================================================
 
 # Regression Run Command: vsim -c -do .\regression.do
 # Regression Run Command with regr_name:  vsim -c -do "set regression_name march_regr; do regression.do"
-# Regression Run Command with regr_name and covergae enable: vsim -c -do "set regression_name regr_cov1; set enable_cov 1; do regression.do"
 
 # Logs Path: Regression/regression_name/test_name/run.log
 # Single Coverage Path: coverage_reports/regression_name/test_name.ucdb

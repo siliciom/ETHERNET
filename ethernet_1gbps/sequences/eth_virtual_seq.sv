@@ -9,8 +9,8 @@ class base_virtual_seq extends uvm_sequence;
   bit [15:0] TPID;
   bit payload_rand_en = 1;
   rand bit corrupt_preamble_en;
-  bit multicast_en = 0;
-  bit broadcast_en = 0;
+  bit multicast_en;
+  bit broadcast_en;
 
   bit pause_frame_en;
   bit [15:0] pause_opc;
@@ -32,14 +32,12 @@ class base_virtual_seq extends uvm_sequence;
   bit pause_normal_traffic ;
   int no_of_pkts;
   int count;
-  int pause_gap_cnt=0;
+  int pause_gap_cnt;
   bit pause_simul_en;
-  bit simul_pause_en2=0;
+  bit simul_pause_en2;
   bit simul_pause_time2;
-  bit send_immediate_xon=0;
-  bit basic_pfc_en;
-  bit normal_xon_xoff_en;
- 
+  bit send_immediate_xon;
+  bit normal_xon_xoff_en; 
   bit pause_rsd_en;
   bit pause_update_time_en;
   bit middle_coll_en;
@@ -48,13 +46,26 @@ class base_virtual_seq extends uvm_sequence;
   int constant_rand_slot;
   bit late_coll_en;
   bit burst_en;
+  bit basic_pfc_en;
+  bit pfc_overlap_en;
+  bit pfc_simul_en;
+  bit simul_pfc_en2;
+  bit pfc_rand_pri_en;
+  int paused_pcp_q[$];
+  int paused_pcp_q2[$];
+  int temp;
+  int paused_pcp_q1[$];
+  bit back_to_back_xoff_xon_en;
+  bit waiting_for_xon;
+  bit [2:0] paused_prio;
+  bit seq2_pcp_en;
+  bit vlan_phase;
+  bit [2:0]pcp_temp;
+  bit pkt_gap_cnt;
 
   function new (string name = "base_virtual_seq");
     super.new(name);
   endfunction  
-
-
-
 endclass
 
 class virtual_seq extends base_virtual_seq;
@@ -63,11 +74,9 @@ class virtual_seq extends base_virtual_seq;
 
   gmii_eth_normal_frame_seq seq1, seq2;  
 
-
   function new (string name = "virtual_seq");
     super.new(name);
   endfunction  
-
 
   task body();
     `ifdef HALF_DUPLEX
@@ -77,10 +86,8 @@ class virtual_seq extends base_virtual_seq;
     `endif
     $display("---------- MODE = %0d -----------",this.mode);
     if(!pause_normal_traffic && ! pfc_with_vlan_traffic) begin // This will work in default mode
-
       seq1 = gmii_eth_normal_frame_seq::type_id::create("seq1");
       seq2 = gmii_eth_normal_frame_seq::type_id::create("seq2");
-
       // Configure sequences config variables received from test
       apply_config(seq1);
       apply_config(seq2);
@@ -91,131 +98,230 @@ class virtual_seq extends base_virtual_seq;
       end
       // Start two sequences in parallel
       else begin
-	if(this.middle_coll_en == 1) begin
-	  fork
-	    seq1.start(p_sequencer.mac_seqr_h[0]);
-	    #160 seq2.start(p_sequencer.mac_seqr_h[1]);
-	  join        
-	end else begin    
-	  fork
-	    seq1.start(p_sequencer.mac_seqr_h[0]);
-	    seq2.start(p_sequencer.mac_seqr_h[1]);
-	  join
-	end
+	      if(this.middle_coll_en == 1) begin
+	        fork
+	          seq1.start(p_sequencer.mac_seqr_h[0]);
+	          #160 seq2.start(p_sequencer.mac_seqr_h[1]);
+	        join        
+	      end 
+        else begin    
+	        fork
+	          seq1.start(p_sequencer.mac_seqr_h[0]);
+	          seq2.start(p_sequencer.mac_seqr_h[1]);
+	        join
+	      end
       end
     end
-
     else begin
-
       if(this.mode==1) begin
-
         //------------------pause, normal traffic--------------
-
         if(pause_normal_traffic) begin
-	  fork
-	  begin
-	    repeat(this.no_of_pkts) begin
-	      seq1 = gmii_eth_normal_frame_seq::type_id::create("seq1");
-	      apply_config(seq1);
-	      if(pause_gap_cnt >0)
-		pause_gap_cnt--;
-	      if(send_immediate_xon) begin
-		seq1.pause_sel=1;
-		seq1.pause_time=0; //Xon
-		send_immediate_xon=0;
+	        fork
+	          begin
+	            repeat(this.no_of_pkts) begin
+	              seq1 = gmii_eth_normal_frame_seq::type_id::create("seq1");
+	              apply_config(seq1);
+	              if(pause_gap_cnt >0)
+		              pause_gap_cnt--;
+	              if(send_immediate_xon) begin
+		              seq1.pause_sel=1;
+		              seq1.pause_time=0; //Xon
+		              send_immediate_xon=0;
+	              end 
+	              //Normal_pause +(Xon & Xoff)
+	              else if(normal_xon_xoff_en && pause_gap_cnt==0 && $urandom_range(1,100)<10) begin
+		              seq1.pause_sel = 1;
+		              if($urandom_range(1,100)<=3)
+		                seq1.pause_time=0; //xon
+		              else begin
+		                seq1.pause_time=$urandom_range(1,10); //xoff
+		                if($urandom_range(1,100)<=4)
+		                  send_immediate_xon=1;
+		              end   
+		              pause_gap_cnt = $urandom_range(5,6);
+	              end 
+	              //reserved_opcode
+	              else if(pause_rsd_en && $urandom_range(0,100)<5) begin
+	              	seq1.pause_sel=1;
+	              	seq1.pause_rsd_en=pause_rsd_en;
+	              	seq1.pause_time=$urandom_range(1,10);
+	              end
+	              //pause_update_time
+	              else if(this.pause_update_time_en  && ($urandom_range(1,100)<20) ) begin
+		              seq1.pause_sel =1;
+		              seq1.pause_time=$urandom_range(1,10);
+	              end
+	              //simultaneous_pause_frames
+	              else if(this.pause_simul_en && $urandom_range(1,50)<5) begin
+		              seq1.pause_sel  = 1;
+		              seq1.pause_time = $urandom_range(1,10);
+		              simul_pause_en2   = 1;
+		              simul_pause_time2 = $urandom_range(1,10);
+	              end
+                //pause_with_vlan_frames
+	              else if(this.vlan_pause_en && $urandom_range(1,100)<7) begin
+                  seq1.pause_sel=1;
+                  seq1.pause_time=$urandom_range(1,10);
+                end	      
+	              else     
+		              seq1.pause_sel=0;
+	              seq1.start(p_sequencer.mac_seqr_h[0]);
+	     	      end
+	          end
+	          begin
+	            repeat(this.no_of_pkts) begin
+	              seq2 = gmii_eth_normal_frame_seq::type_id::create("seq2");
+	              apply_config(seq2);
+	              if(simul_pause_en2) begin
+		              seq2.pause_sel  = 1;
+		              seq2.pause_time = simul_pause_time2;
+		              simul_pause_en2 = 0;
+	              end
+	              else
+		              seq2.pause_sel = 0;
+	              seq2.start(p_sequencer.mac_seqr_h[1]);
+	          end
+	        end
+	        join
 	      end 
-	      //Normal_pause +(Xon & Xoff)
-	      else if(normal_xon_xoff_en && pause_gap_cnt==0 && $urandom_range(1,100)<10) begin
-		seq1.pause_sel = 1;
-		if($urandom_range(1,100)<=3)
-		  seq1.pause_time=0; //xon
-		else begin
-		  seq1.pause_time=$urandom_range(1,10); //xoff
-		  if($urandom_range(1,100)<=4)
-		    send_immediate_xon=1;
-		end   
-		pause_gap_cnt = $urandom_range(5,6);
-	      end 
-
-	      //reserved_opcode
-	      else if(pause_rsd_en && $urandom_range(0,100)<5) begin
-		seq1.pause_sel=1;
-		seq1.pause_rsd_en=pause_rsd_en;
-		seq1.pause_time=$urandom_range(1,10);
-	      end
- 
-	      //pause_update_time
-	      else if(this.pause_update_time_en  && ($urandom_range(1,100)<20) ) begin
-		seq1.pause_sel =1;
-		seq1.pause_time=$urandom_range(1,10);
-	      end
- 
-	      //simultaneous_pause_frames
-	      else if(this.pause_simul_en && $urandom_range(1,50)<5) begin
-		seq1.pause_sel  = 1;
-		seq1.pause_time = $urandom_range(1,10);
-		simul_pause_en2   = 1;
-		simul_pause_time2 = $urandom_range(1,10);
-	      end
-	      else if(this.vlan_pause_en && $urandom_range(1,100)<7) begin
-                seq1.pause_sel=1;
-                seq1.pause_time=$urandom_range(1,10);
-              end	      
-	      else     
-		seq1.pause_sel=0;
-	      seq1.start(p_sequencer.mac_seqr_h[0]);
-	      count++;
-	    end
-	  end
-	  begin
-	    repeat(this.no_of_pkts) begin
-	      seq2 = gmii_eth_normal_frame_seq::type_id::create("seq2");
-	      apply_config(seq2);
-	      if(simul_pause_en2) begin
-		seq2.pause_sel  = 1;
-		seq2.pause_time = simul_pause_time2;
-		simul_pause_en2 = 0;
-	      end
-	      else
-		seq2.pause_sel = 0;
-	      seq2.start(p_sequencer.mac_seqr_h[1]);
-	    end
-	  end
-	  join
-	end 
-
         //---------------- VLAN TRAFFIC+pfc ----------------   
         if(pfc_with_vlan_traffic) begin
-
           fork
+            begin
+              repeat(this.no_of_pkts) begin
+                seq1 = gmii_eth_normal_frame_seq::type_id::create($sformatf("vlan_seq_%0d",$time));
+                apply_config(seq1);
 
-          begin
-            repeat(this.no_of_pkts) begin
+                if(pkt_gap_cnt >0)
+		              pkt_gap_cnt--;
+                //Basic_pfc  
+                if(basic_pfc_en && $urandom_range(1,50)<10) begin
+                  seq1.pfc_sel=1;	
+                  seq1.temp_pcp=3;//$urandom_range(1,4);
+                  seq1.priority_en_vector[seq1.temp_pcp] = 1;// priority[3] 
+                  for(int i=0;i<8;i++)
+                    seq1.pfc_pause_time[i]=$urandom_range(1,5);  
+                end  
+                //random_priority
+                else if(pfc_rand_pri_en && $urandom_range(1,100)<=10) begin
+                  seq1.pfc_sel=1;
+                  pcp_temp=$urandom_range(0,7);
+                  seq1.temp_pcp=pcp_temp;
+                  seq2_pcp_en=1; 
+                  seq1.priority_en_vector[seq1.temp_pcp]=1;
+                  for(int i=0;i<8;i++) 
+                    seq1.pfc_pause_time[i]=$urandom_range(1,10);
+                end  
+                //Simulataneous_pfc
+                else if(pfc_simul_en && $urandom_range(1,50) <=10) begin
+                  seq1.pfc_sel=1;
+                  seq1.temp_pcp=$urandom_range(0,7);
+                  paused_pcp_q.push_back(seq1.temp_pcp);
+                  seq1.priority_en_vector[seq1.temp_pcp]=1;
+                  seq1.pfc_pause_time[seq1.temp_pcp]=$urandom_range(5,10);
+                  `uvm_info("seqqq_mac0",$sformatf("pcp=%0d, pfc_pause_time=%0d",seq1.temp_pcp,seq1.pfc_pause_time[seq1.temp_pcp]),UVM_LOW)
+                  simul_pfc_en2=1;
+                  if($urandom_range(1,50)<=30) begin
+                     temp=$urandom_range(0,7);
+                     if(temp inside {paused_pcp_q})
+                      seq1.pfc_pause_time[temp]=0;
+                  end 
+                end  
+                //Back_to_back_xoff_xon
+                else if(back_to_back_xoff_xon_en &&(waiting_for_xon || $urandom_range(1,100)<10) && pkt_gap_cnt==0) begin
+                  seq1.pfc_sel = 1;
+		              if(!waiting_for_xon) begin
+			              paused_prio = $urandom_range(0,7);
+			              seq1.temp_pcp = paused_prio;
+			              seq1.priority_en_vector[paused_prio] = 1;
+                    for(int i=0;i<8;i++)
+			                seq1.pfc_pause_time[i] = $urandom_range(5,10);
+			              waiting_for_xon = 1; 
+                    `uvm_info("VIRTUAL_SEQ",$sformatf(" XOFF sent for prio=%0d,priority_en[%0d]=%0d,pfc_pause_time[%0d]= %0d", paused_prio,
+                           seq1.temp_pcp,seq1.priority_en_vector[paused_prio], seq1.temp_pcp,seq1.pfc_pause_time[paused_prio]),UVM_LOW)
+		              end 
+		              else begin
+			              seq1.temp_pcp = paused_prio;
+			              seq1.priority_en_vector[paused_prio] = 1;
+			              seq1.pfc_pause_time[paused_prio] = 0;
+			              waiting_for_xon = 0;
+                    `uvm_info("VIRTUAL_SEQ",$sformatf(" XON sent for prio=%0d,priority_en[%0d]=%0d,pfc_pause_time[%0d]= %0d", paused_prio,
+                              seq1.temp_pcp,seq1.priority_en_vector[paused_prio], seq1.temp_pcp,seq1.pfc_pause_time[paused_prio]),UVM_LOW)
+		              end 
+                  pkt_gap_cnt=2;
+	              end
+                //independent_priority_overlap
+                else if(pfc_overlap_en) begin
+                  if(!vlan_phase) begin
+                    if(paused_pcp_q1.size()==0) begin
+                      paused_pcp_q1='{0,1,2,3,4,5,6,7};
+                      paused_pcp_q1.shuffle();
+                    end 
+                    else begin
+                      seq1.pfc_sel=1;
+                      seq1.pfc_overlap_en=pfc_overlap_en;
+                      seq1.temp_pcp=paused_pcp_q1.pop_back();
+                      seq1.priority_en_vector[seq1.temp_pcp]=1;
+                      for(int i=0;i<8;i++) 
+                        seq1.pfc_pause_time[i]=$urandom_range(5,10);
+                      
+                      if(paused_pcp_q1.size()==0) begin
+                        vlan_phase=1;
+                        pause_gap_cnt=$urandom_range(50,100);
+                        this.pfc_overlap_en=0;
+                      end  
+                    end
+                   end 
+                end 
+                else begin
+                  seq1.pfc_sel = 0;
+                  pause_gap_cnt--;
 
-              seq1 = gmii_eth_normal_frame_seq::type_id::create
-              ($sformatf("vlan_seq_%0d",$time));
-
-              apply_config(seq1);
-              if(basic_pfc_en && $urandom_range(1,100)<10) begin
-                seq1.pfc_sel=1;	
-              end  
-              else
-                seq1.pfc_sel = 0;
-              seq1.start(p_sequencer.mac_seqr_h[0]);
-              count++;
+                  if(pause_gap_cnt==0) begin
+                    vlan_phase = 0;
+                    pfc_overlap_en=1;
+                  end  
+                end  
+                seq1.start(p_sequencer.mac_seqr_h[0]);
+              end
             end
-          end
-          begin
-            repeat(this.no_of_pkts) begin
-
-              seq2 = gmii_eth_normal_frame_seq::type_id::create
-              ($sformatf("pfc_seq_%0d",$time));
-
-              apply_config(seq2);
-              seq2.pfc_sel =0;
-              seq2.start(p_sequencer.mac_seqr_h[1]);
+            begin
+              repeat(this.no_of_pkts) begin
+                seq2 = gmii_eth_normal_frame_seq::type_id::create ($sformatf("pfc_seq_%0d",$time));
+                apply_config(seq2);
+                seq2.basic_pfc_en=this.basic_pfc_en;
+                seq2.pfc_rand_pri_en=this.pfc_rand_pri_en;
+                if(seq2_pcp_en)  begin
+                  seq2.temp_pcp=pcp_temp;
+                  seq2_pcp_en=0;
+                end 
+                if(simul_pfc_en2) begin
+                  seq2.pfc_sel=1;
+                  seq2.temp_pcp=$urandom_range(0,7);
+                  paused_pcp_q2.push_back(seq2.temp_pcp);
+                  seq2.priority_en_vector[seq2.temp_pcp]=1;
+                  seq2.pfc_pause_time[seq2.temp_pcp]=$urandom_range(1,10);
+                  `uvm_info("seqqq_mac1",$sformatf("pcp=%0d, pfc_pause_time=%0d",seq2.temp_pcp,seq2.pfc_pause_time[seq2.temp_pcp]),UVM_LOW)
+                  simul_pfc_en2=0;
+                  if($urandom_range(1,50)<=30) begin
+                    temp=$urandom_range(0,7);
+                    if(temp inside {paused_pcp_q2})
+                      seq2.pfc_pause_time[temp]=0;
+                    end  
+                  end
+                  else begin
+                    if(waiting_for_xon && $urandom_range(1,10)<5) begin
+		                  seq2.force_pcp_en = 1;
+		                  seq2.force_pcp    = paused_prio;
+		     	          end
+	                else begin
+		                seq2.force_pcp_en = 0;
+	                end
+                  seq2.pfc_sel =0;
+                end 
+                seq2.start(p_sequencer.mac_seqr_h[1]);
+              end
             end
-          end
           join
         end
       end
@@ -231,8 +337,6 @@ class virtual_seq extends base_virtual_seq;
     seq.vlan_en             = this.vlan_en;
     seq.TPID                = this.TPID;
     seq.payload_rand_en     = this.payload_rand_en;
-    // seq.pause_frame_en      = this.pause_frame_en;
-    // seq.pause_opc           = this.pause_opc;
     seq.corrupt_preamble_en = this.corrupt_preamble_en;
     seq.mode                = this.mode;
     seq.corrupt_fcs_en      = this.corrupt_fcs_en;
@@ -250,9 +354,7 @@ class virtual_seq extends base_virtual_seq;
     seq.constant_rand_slot  = this.constant_rand_slot;
     seq.late_coll_en        = this.late_coll_en;
     seq.burst_en            = this.burst_en;
-
   endtask   
-
 endclass
 
 

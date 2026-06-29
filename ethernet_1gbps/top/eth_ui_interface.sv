@@ -15,11 +15,14 @@ interface eth_ui_interface();
   logic [31:0] tx_pause_count;
   logic [31:0] tx_vlan_count;
   logic [31:0] tx_ipg_violation_count;
-  logic [31:0] tx_pfc_count;
+  logic [31:0] tx_pfc_xon_count;
+  logic [31:0] tx_pfc_xoff_count;
   logic [31:0] tx_carrier_ext_count;
   logic [31:0] tx_pause_xon_count; 
   logic [31:0] tx_pause_xoff_count;
   logic [31:0] tx_control_pkt_count;
+  logic [31:0] tx_pfc_xon_prio_count [8];
+  logic [31:0] tx_pfc_xoff_prio_count [8];
   
   
   //Rx Counters
@@ -38,11 +41,14 @@ interface eth_ui_interface();
   logic [31:0] rx_vlan_count;
   logic [31:0] rx_drop_count;
   logic [31:0] rx_ipg_violation_count;
-  logic [31:0] rx_pfc_count;
+  logic [31:0] rx_pfc_xon_count;
+  logic [31:0] rx_pfc_xoff_count;
   logic [31:0] rx_carrier_ext_count;
   logic [31:0] rx_pause_xon_count; 
   logic [31:0] rx_pause_xoff_count;
   logic [31:0] rx_control_pkt_count;
+  logic [31:0] rx_pfc_xon_prio_count [8];
+  logic [31:0] rx_pfc_xoff_prio_count [8];
   
   
 endinterface

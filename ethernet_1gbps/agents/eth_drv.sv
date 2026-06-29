@@ -22,6 +22,14 @@ class eth_drv extends uvm_driver#(eth_seq_item);
   int PAUSE_QUANTA_CYCLES;
   bit mid_en;
   bit first_pkt;
+  eth_seq_item pfc_hold_q[8][$];
+  int resumed_pcp_q[$];
+  semaphore tx_sem;
+  bit[2:0] current_tx_pcp;
+  bit current_tx_vlan_en=0;
+  bit drain_in_progress=0;
+
+
  
   function new(string name = "eth_drv", uvm_component parent = null);
     super.new(name,parent);
@@ -36,7 +44,7 @@ class eth_drv extends uvm_driver#(eth_seq_item);
       `uvm_info(get_type_name(),"CONNECTION_PASSED",UVM_LOW) 
       
     PAUSE_QUANTA_CYCLES = (512 / $bits(`v_if.TXD));   
-  
+    tx_sem = new(1); 
   endfunction    
   
   task run_phase(uvm_phase phase);
@@ -46,20 +54,44 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     fork
       pause_timer();
       pfc_timer();
-    join_none       
+      drain_resumed_frames();
+    join_none  
+
     forever begin    
       wait(statistics::pause_flag[mac_addr]==0);
       seq_item_port.get_next_item(tr);
-      frame_pack(tr);
-      retry_q = frame_q;
-      drive_tx_frame(tr);    
-      seq_item_port.item_done(); 
-    end
+      if(tr.vlan_en && statistics::pfc_flag[mac_addr][tr.PCP]) begin
+       pfc_hold_q[tr.PCP].push_back(tr);
+       `uvm_info("PFC_HOLD_Q",$sformatf("pcp=%d mac_addr=%h pushed",
+                tr.PCP,mac_addr),UVM_LOW)
+       `uvm_info("HOLD_Q",$sformatf("valn_en=%h,pcp=%h,len=%h,payload=%p",tr.vlan_en,tr.PCP,tr.ether_type,tr.payload),UVM_LOW)
+      end
+      else begin
+        wait_for_drain_complete(.hold_sem(0));
+        if(drain_in_progress) begin
+          `uvm_info("DRV_YIELD", "drain in progress — waiting", UVM_LOW)
+          wait(drain_in_progress == 0);
+          `uvm_info("DRV_YIELD_DONE", "drain complete — proceeding", UVM_LOW)
+        end
+        tx_sem.get(1);
+        wait_for_drain_complete(.hold_sem(1));
+        if(tr.vlan_en && statistics::pfc_flag[mac_addr][tr.PCP]) begin
+          pfc_hold_q[tr.PCP].push_back(tr);
+          `uvm_info("Re_PFC_HOLD_Q",$sformatf("pcp=%d pushed", tr.PCP), UVM_LOW)
+          `uvm_info("HOLD_Q",$sformatf("valn_en=%h,pcp=%h,len=%h,payload=%p",tr.vlan_en,tr.PCP,tr.ether_type,tr.payload),UVM_LOW)
+          tx_sem.put(1);
+        end
+        else begin
+          frame_pack(tr);
+          retry_q = frame_q;
+          drive_tx_frame(tr); 
+          tx_sem.put(1);
+        end
+      end
+      seq_item_port.item_done();
+    end  
   endtask
-    
-  //---------------------------------------------------
-  //             pause_timer_task
-  //---------------------------------------------------- 
+  //pause_timer_task
   task pause_timer();
     int local_pause_cycles;
     int prev_pause_value;
@@ -72,7 +104,6 @@ class eth_drv extends uvm_driver#(eth_seq_item);
       local_pause_cycles = prev_pause_value * PAUSE_QUANTA_CYCLES;
       `uvm_info("PAUSE_DBG", $sformatf("*********************mac=%0d remaining=%0d pause_value=%0d update=%0b",
                mac_addr[7:0], local_pause_cycles, statistics::pause_value[mac_addr], statistics::pause_update[mac_addr]), UVM_LOW)
-
       while(local_pause_cycles > 0 ) begin
         @(posedge v_intf.TX_CLK);
         `v_if.TX_EN <= 0;
@@ -88,48 +119,199 @@ class eth_drv extends uvm_driver#(eth_seq_item);
           local_pause_cycles--;
         end
       end
-
       statistics::pause_flag[mac_addr] = 0;
       `uvm_info("PAUSE", $sformatf("TX Resume mac_id=%0d",mac_addr[7:0]), UVM_LOW)
     end
   endtask
   
-  //---------------------------------------------------
-  //             pfc_timer_task
-  //---------------------------------------------------- 
+  //pfc_timer_task
   task pfc_timer();
     int local_pfc_cycles[8];
     int prev_pfc_value[8];
-    forever begin
+	  bit pfc_pending[8];
+    bit pfc_just_started[8];
+
+     forever begin
+      @(posedge v_intf.TX_CLK);
       for(int i=0; i<8; i++) begin
-        if(statistics::pfc_flag[mac_addr][i] && local_pfc_cycles[i]==0) begin
-	  prev_pfc_value[i] = statistics::pfc_value[mac_addr][i];
-          local_pfc_cycles[i] = prev_pfc_value[i] * PAUSE_QUANTA_CYCLES;
-            `uvm_info("PFC_UPDATE", $sformatf("Priority=%0d pause_value=%0d pause_cycles=%0d", 
-                      i, prev_pfc_value[i], local_pfc_cycles[i]), UVM_LOW)
+
+        if(pfc_pending[i] && !(frame_in_progress && current_tx_vlan_en && current_tx_pcp == i)) begin
+          // Frame is now done for this priority — start timer now
+          pfc_pending[i]                           = 0;
+          prev_pfc_value[i]                        = statistics::pfc_value[mac_addr][i];
+          local_pfc_cycles[i]                      = prev_pfc_value[i] * PAUSE_QUANTA_CYCLES;
+          pfc_just_started[i]=1;
+          statistics::pfc_update[mac_addr][i]      = 0;
+          `uvm_info("PFC_TIMER_START", $sformatf("pcp=%0d start_time=%0t", i, $time), UVM_LOW)
+        end
+        // Fresh PFC flag
+        if(statistics::pfc_flag[mac_addr][i] && local_pfc_cycles[i]==0 && !pfc_pending[i]) begin
+          `uvm_info("DRV_TIMER_START",
+            $sformatf("pcp=%0d pfc_value=%0d", i, statistics::pfc_value[mac_addr][i]), UVM_LOW)
+          // XON (pfc_value == 0)
+          if(statistics::pfc_value[mac_addr][i] == 0) begin
+            local_pfc_cycles[i]                  = 0;
+            statistics::pfc_flag[mac_addr][i]    = 0;
+            statistics::pfc_update[mac_addr][i]  = 0;
+            push_resumed_pcp(i);
+          end
+          // Frame in progress for this priority
+          else if(frame_in_progress && current_tx_vlan_en && current_tx_pcp == i) begin
+            pfc_pending[i] = 1;  
+            `uvm_info("PFC_WAIT",
+              $sformatf("pcp=%0d frame in progress, deferring timer start", i), UVM_LOW)
+          end
+          else begin
+            prev_pfc_value[i]                          = statistics::pfc_value[mac_addr][i];
+            local_pfc_cycles[i]                        = prev_pfc_value[i] * PAUSE_QUANTA_CYCLES;
+            pfc_just_started[i]=1;
+            statistics::pfc_update[mac_addr][i]        = 0;
+            `uvm_info("PFC_TIMER_START",$sformatf("pcp=%0d start_time=%0t", i, $time), UVM_LOW)
+          end
         end
       end
-
-      @(posedge v_intf.TX_CLK);
       // TIMER RUNNING
       for(int i=0;i<8;i++) begin
-        if(local_pfc_cycles[i] > 0) begin
+         if(local_pfc_cycles[i] > 0) begin
+          
             if(statistics::pfc_update[mac_addr][i])begin
-	      prev_pfc_value[i]=statistics::pfc_value[mac_addr][i];
-	      local_pfc_cycles[i] = prev_pfc_value[i] * PAUSE_QUANTA_CYCLES;
-	      statistics::pfc_update[mac_addr][i]=0;
+
+              //Xon update
+              if(statistics::pfc_value[mac_addr][i]==0) begin            		   
+	              prev_pfc_value[i]=statistics::pfc_value[mac_addr][i];		   
+	              local_pfc_cycles[i] =0;
+	              statistics::pfc_flag[mac_addr][i] = 0;
+	              statistics::pfc_update[mac_addr][i]=0;
+                push_resumed_pcp(i);   
+                continue;
+              end 
+              else begin
+			  	      prev_pfc_value[i] = statistics::pfc_value[mac_addr][i];
+                local_pfc_cycles[i] = prev_pfc_value[i]*PAUSE_QUANTA_CYCLES;
+		           	statistics::pfc_update[mac_addr][i]=0;
+				      end
             end 
-            if(frame_in_progress==0)
-              local_pfc_cycles[i]--;
- 
-	    if(local_pfc_cycles[i] == 0) begin
-	      statistics::pfc_flag[mac_addr][i] = 0;
-	      prev_pfc_value[i] = 0;
-	      `uvm_info("PFC_RESUME", $sformatf("Priority=%0d resumed", i), UVM_LOW)
-           end
+            if(pfc_just_started[i]) begin
+              `uvm_info("DRV_TIMER",$sformatf("local=%0d,i=%0d",local_pfc_cycles[i],i),UVM_LOW)
+               pfc_just_started[i]=0;
+               continue ;
+            end     
+            local_pfc_cycles[i]--;
+            `uvm_info("DRV_TIMER",$sformatf("local=%0d,i=%0d",local_pfc_cycles[i],i),UVM_LOW)
+            if(local_pfc_cycles[i] == 0) begin
+              statistics::pfc_flag[mac_addr][i]           = 0;
+              prev_pfc_value[i]                           = 0;
+             	push_resumed_pcp(i);
+            end
+         end
+      end
+     end
+  endtask
+  
+  task drain_resumed_frames();
+    forever begin
+      eth_seq_item local_tr;
+      int pcp;
+      wait(resumed_pcp_q.size() > 0);
+      `uvm_info("DRAIN_GOT", $sformatf("got pcp=%0d",resumed_pcp_q[0]), UVM_LOW)
+      pcp = resumed_pcp_q.pop_front();
+      if(pfc_hold_q[pcp].size() > 0) begin
+        drain_in_progress = 1;
+        `uvm_info("DRAIN_START",$sformatf("pcp=%0d frames=%0d drain_in_progress=1",
+                    pcp, pfc_hold_q[pcp].size()), UVM_LOW)
+      end
+      while(pfc_hold_q[pcp].size() > 0) begin
+        if(statistics::pfc_flag[mac_addr][pcp]) begin          
+          `uvm_info("PFC_REBLOCK",$sformatf("xoff re-arrived pcp=%0d — waiting", pcp), UVM_LOW)
+          wait(statistics::pfc_flag[mac_addr][pcp] == 0);
+          foreach(resumed_pcp_q[k]) begin
+            if(resumed_pcp_q[k] == pcp) begin
+              resumed_pcp_q.delete(k);
+              break;
+            end
+          end
+        end
+        local_tr = pfc_hold_q[pcp].pop_front();
+        tx_sem.get(1);                                            
+        if(statistics::pfc_flag[mac_addr][pcp]) begin              
+          pfc_hold_q[pcp].push_front(local_tr);   
+          `uvm_info("HOLD_Q",$sformatf("valn_en=%h,pcp=%h,len=%h,payload=%p",local_tr.vlan_en,local_tr.PCP,local_tr.ether_type,local_tr.payload),UVM_LOW)
+         `uvm_info("PFC_HOLD_Q2",$sformatf("pcp=%d mac_addr=%h pushed",tr.PCP,mac_addr),UVM_LOW)
+          tx_sem.put(1);
+          continue;         
+        end
+        frame_pack(local_tr);
+        retry_q = frame_q;
+        `uvm_info("RESUMED_PFC", 
+                  $sformatf("mac_addr=%h PCP=%0d driving held frame remaining=%0d", mac_addr, pcp, pfc_hold_q[pcp].size()), UVM_LOW)
+        `uvm_info("RESUMED_FRAME",
+                  $sformatf("valn_en=%h,pcp=%h,len=%h,payload=%p",local_tr.vlan_en,local_tr.PCP,local_tr.ether_type,local_tr.payload),UVM_LOW)
+        drive_tx_frame(local_tr);
+        tx_sem.put(1);
+      end
+      // current PCP fully drained — check if more PCPs still pending
+      begin
+        bit more_pending;
+        more_pending = 0;
+        foreach(resumed_pcp_q[k]) begin
+          if(pfc_hold_q[resumed_pcp_q[k]].size() > 0) begin
+            more_pending = 1;
+            break;
+          end
+        end
+        if(!more_pending) begin
+          drain_in_progress = 0;   // ALL pending drains done — release main loop
+          `uvm_info("DRAIN_DONE", "all resumed queues drained — drain_in_progress=0", UVM_LOW)
+        end
+        else begin
+          `uvm_info("DRAIN_MORE",
+           $sformatf("more pcps pending in resumed_pcp_q — staying blocked"), UVM_LOW)
         end
       end
     end
+  endtask
+  task wait_for_drain_complete(bit hold_sem = 0);
+    bit any_draining;
+    forever begin
+      any_draining = 0;
+      // check all 8 priority queues
+      for (int i = 0; i < 8; i++) begin
+        if (pfc_hold_q[i].size() > 0 && !statistics::pfc_flag[mac_addr][i]) begin
+          any_draining = 1;
+          `uvm_info("DRV_YIELD",$sformatf("pcp=%0d draining (%0d frames) — new frame waiting",
+           i, pfc_hold_q[i].size()), UVM_LOW)
+          break;
+        end
+      end
+      // also check resumed_pcp_q entries
+      if (!any_draining && resumed_pcp_q.size() > 0) begin
+        foreach (resumed_pcp_q[k]) begin
+          if (pfc_hold_q[resumed_pcp_q[k]].size() > 0) begin
+            any_draining = 1;
+            `uvm_info("DRV_YIELD_RESUMEQ",$sformatf("resumed_pcp_q has pcp=%0d with %0d frames pending",
+                        resumed_pcp_q[k], pfc_hold_q[resumed_pcp_q[k]].size()), UVM_LOW)
+            break;
+          end
+        end
+      end
+      if (!any_draining) break;          
+      if (hold_sem) tx_sem.put(1);      
+      @(posedge v_intf.TX_CLK);
+      if (hold_sem) tx_sem.get(1);       
+    end
+  endtask
+
+  task push_resumed_pcp(int pcp);
+    foreach(resumed_pcp_q[k]) begin
+      if(resumed_pcp_q[k] == pcp) begin
+        `uvm_info("RESUMED_DUP",
+          $sformatf("pcp=%0d already in resumed_pcp_q — skipped", pcp), UVM_LOW)
+        return;
+      end
+    end
+    resumed_pcp_q.push_back(pcp);
+    `uvm_info("RESUMED_PUSH",
+      $sformatf("pcp=%0d pushed, q_size=%0d", pcp, resumed_pcp_q.size()), UVM_LOW)
   endtask
 
   task drive_reset();
@@ -145,26 +327,70 @@ class eth_drv extends uvm_driver#(eth_seq_item);
         `v_if.TX_EN <= 0;      
         `v_if.TXD   <= 8'h0F;
         `v_if.TX_ER <= 1;
-	idx++;	
+	      idx++;	
       end
       `uvm_info("CARR_EXT",$sformatf("Sending Carrer Extension for %0d bytes",idx),UVM_LOW);
     end    
   endtask
   
-  task pfc_check(eth_seq_item tr);
-    if(tr.vlan_en) begin
-      while(statistics::pfc_flag[mac_addr][tr.PCP]) begin
-        `uvm_info("PFC_BLOCK", $sformatf("Blocking priority %0d transmission", tr.PCP), UVM_LOW)
-         @(posedge v_intf.TX_CLK);
-       end
-     end
-  endtask    
+  function void phase_ready_to_end(uvm_phase phase);
+    bit all_done;
+    all_done = 1;
+
+    // check 1: any PFC timer still active?
+    for(int i = 0; i < 8; i++) begin
+      if(statistics::pfc_flag[mac_addr][i]) begin
+        all_done = 0;
+        break;
+      end
+    end
+    //check 2: any held frames still in queue?
+    for(int i = 0; i < 8; i++) begin
+      if(pfc_hold_q[i].size() > 0) begin
+        all_done = 0;
+        break;
+      end
+    end
+    // check 3: any pending resumes not yet drained?
+    if(resumed_pcp_q.size() > 0)
+      all_done = 0;
+    if(!all_done) begin
+      phase.raise_objection(this, "PFC timers/queues still pending");
+      fork
+        begin
+          forever begin
+            all_done = 1;
+            for(int i = 0; i < 8; i++) begin
+              if(statistics::pfc_flag[mac_addr][i]) begin
+                all_done = 0; break;
+              end
+            end
+            for(int i = 0; i < 8; i++) begin
+              if(pfc_hold_q[i].size() > 0) begin
+                all_done = 0; break;
+              end
+            end
+            if(resumed_pcp_q.size() > 0)
+              all_done = 0;
+            if(all_done) begin
+              `uvm_info("PFC_DRAIN_DONE",$sformatf("All PFC timers expired mac=%0h", mac_addr), UVM_LOW)
+              phase.drop_objection(this, "PFC timers done");
+              break;
+            end
+            @(posedge v_intf.TX_CLK);
+          end
+        end
+      join_none
+    end
+  endfunction 
+  
     
   task drive_tx_frame(eth_seq_item tr);
     int k;
 
-    pfc_check(tr);
     frame_in_progress=1;
+    current_tx_vlan_en=tr.vlan_en;
+    current_tx_pcp=tr.PCP;
 
     if(!mode && tr.middle_coll_en && !mid_en) mid_en = 1; 
     else if(!mode) wait(!`v_if.CRS);
@@ -172,43 +398,51 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     for (int j = 0; j < idx; j++) begin
       @(posedge v_intf.TX_CLK); 
       if(j >= 8) begin
-	k = j-8;
+	      k = j-8;
         if(tr.late_coll_en && k == tr.coll_byte && collision_detect == 0) begin
           v_intf.COL <= 1;
           `uvm_info("Late collision", $sformatf("Late collision in byte = %0d", k), UVM_LOW)
-        end else
-	  v_intf.COL <= 0;	
+        end
+        else
+	        v_intf.COL <= 0;	
       end
       if(`v_if.COL == 1 && k < 64) begin
         frame_q.delete();
         collision_detect = 1;
         break;
-      end else
-	collision_detect = 0;
-      if(j==0)
-	pfc_check(tr);	
+      end 
+      else
+	      collision_detect = 0;
+      if(j==0 && tr.vlan_en) begin
+       if(statistics::pfc_flag[mac_addr][tr.PCP]) begin
+         frame_q.delete();     
+         frame_in_progress = 0;
+         collision_detect  = 0;
+         pfc_hold_q[tr.PCP].push_back(tr);
+        `uvm_info("PFC_HOLD_Q",$sformatf("valn_en=%h,pcp=%h,len=%h,payload=%p",tr.vlan_en,tr.PCP,tr.ether_type,tr.payload),UVM_LOW)
+        return; 
+       end
+      end 	
 
       `v_if.TX_EN <= 1;      
       `v_if.TXD   <= frame_q.pop_front();
       `v_if.TX_ER <= 0;
-
       if(tr.err_b == 1 && j >= tr.err_offset) begin
         `v_if.TX_ER <= 1;
       end    
     end
     v_intf.COL <= 0;      
-      
     if(collision_detect == 1) begin
       send_jam_signal();
       do_back_off_alg(tr);
-    end else begin
+    end
+    else begin
       retry_q.delete();
       retry_count    = 0;
       backoff_k      = 0; 
       rand_slot      = 0;  
       backoff_time   = 0;    
     end
-
     //Adding Carrier Extension if it is less than 512 bytes
     if(!tr.mode && !first_pkt) carrier_ext();
     if(!tr.mode && tr.burst_en && first_pkt == 0) first_pkt = 1;
@@ -317,73 +551,72 @@ class eth_drv extends uvm_driver#(eth_seq_item);
     frame_q[idx++] = tr.ether_type[15:8];    
     frame_q[idx++] = tr.ether_type[7:0];
     
-    
     if(tr.pause_frame_en || tr.pfc_frame_en) begin //Pause Frame Packing
-          frame_q[idx++] = tr.pause_opc[15:8];
-          frame_q[idx++] = tr.pause_opc[7:0];
-          if(tr.pfc_frame_en) begin // logic for pfc frame
-            frame_q[idx++] = tr.priority_en_vector[15:8];
-            frame_q[idx++] = tr.priority_en_vector[7:0];
-            for(int i=0;i<8; i++) begin
-              frame_q[idx++]=tr.pfc_pause_time[i][15:8];
-              frame_q[idx++]=tr.pfc_pause_time[i][7:0];
-            end
-            //payload
-             for(int i = 0; i<26; i++)
-                frame_q[idx++] = 8'h00;
-             `uvm_info("DRIVING DATA",
-                    $sformatf("\n\t da=%h\n\t sa=%h\n\t type=%0h\n\t opcode=%0h\n\t priority_en_vector=%0d \n\t pfc_pause_time=%p 
-										\n\t payload=%0d\n\t Frame size=%0d",tr.da, tr.sa, tr.ether_type, tr.pause_opc,tr.priority_en_vector,
-										tr.pfc_pause_time, tr.payload.size(), idx), UVM_LOW) 
-          end
-          else begin // logic for pause frame
-          frame_q[idx++] = tr.pause_time[15:8];
-          frame_q[idx++] = tr.pause_time[7:0];
-          for(int i = 0; i< 42;i++)
-            frame_q[idx++] = 0;
-          `uvm_info("DRIVING DATA", $sformatf("pause_frame_en=%0b,da=%p,sa=%p,type=%0h,opcode=%0h,payload=%0d,Frame size = %0d",tr.pause_frame_en,tr.da,tr.sa,tr.ether_type,tr.pause_opc,tr.payload.size(),idx),UVM_LOW)
-	  end
-	  end    
-      else begin
-        //Payload packing
-        for(int i = (tr.payload.size()- 1);i >= 0 ;i--)
-          frame_q[idx++] = tr.payload[i];
-        //Zero Padding if payload is less than 46 bytes for normal frame and
-	//42 bytes for vlan tagged frame
-        if(tr.vlan_en == 1)
-          pad_cnt = 42;
-        else
-          pad_cnt = 46;
-        
-        if(tr.payload.size() < pad_cnt && tr.padding_en == 1) begin
-          for(int i = tr.payload.size(); i < pad_cnt; i++)
-            frame_q[idx++] = 0;
+      frame_q[idx++] = tr.pause_opc[15:8];
+      frame_q[idx++] = tr.pause_opc[7:0];
+      if(tr.pfc_frame_en) begin // logic for pfc frame
+        frame_q[idx++] = tr.priority_en_vector[15:8];
+        frame_q[idx++] = tr.priority_en_vector[7:0];
+        for(int i=0;i<8; i++) begin
+          frame_q[idx++]=tr.pfc_pause_time[i][15:8];
+          frame_q[idx++]=tr.pfc_pause_time[i][7:0];
         end
+        //payload
+         for(int i = 0; i<26; i++)
+            frame_q[idx++] = 8'h00;
+         `uvm_info("DRIVING DATA",
+                $sformatf("\n\t da=%h\n\t sa=%h\n\t type=%0h\n\t opcode=%0h\n\t priority_en_vector=%0d \n\t pfc_pause_time=%p 
+								\n\t payload=%0d\n\t Frame size=%0d",tr.da, tr.sa, tr.ether_type, tr.pause_opc,tr.priority_en_vector,
+								tr.pfc_pause_time, tr.payload.size(), idx), UVM_LOW) 
       end
+      else begin // logic for pause frame
+      frame_q[idx++] = tr.pause_time[15:8];
+      frame_q[idx++] = tr.pause_time[7:0];
+      for(int i = 0; i< 42;i++)
+        frame_q[idx++] = 0;
+      `uvm_info("DRIVING DATA", $sformatf("pause_frame_en=%0b,da=%p,sa=%p,type=%0h,opcode=%0h,payload=%0d,Frame size = %0d",tr.pause_frame_en,tr.da,tr.sa,tr.ether_type,tr.pause_opc,tr.payload.size(),idx),UVM_LOW)
+	    end
+	  end    
+    else begin
+      //Payload packing
+      for(int i = (tr.payload.size()- 1);i >= 0 ;i--)
+        frame_q[idx++] = tr.payload[i];
+      //Zero Padding if payload is less than 46 bytes for normal frame and
+	// bytes for vlan tagged frame
+      if(tr.vlan_en == 1)
+        pad_cnt = 42;
+      else
+        pad_cnt = 46;
       
-      //CRC packing
-      next_crc32 = 32'hFFFFFFFF;
-      for(int i = 0;i < idx;i++) begin
-        if(i > 7) //Avoiding the Preamble and SFD Bytes
-          next_crc32 = tr.crc_32(next_crc32, frame_q[i]);
+      if(tr.payload.size() < pad_cnt && tr.padding_en == 1) begin
+        for(int i = tr.payload.size(); i < pad_cnt; i++)
+          frame_q[idx++] = 0;
       end
-      
-      next_crc32 = ~next_crc32;
-      
-      //BAD FCS
-      if(tr.corrupt_fcs_en == 1) begin
-        next_crc32[7:0] = ~next_crc32[7:0];
-        `uvm_info("BAD FCS",$sformatf(" Transmitting Incorrect CRC = %h",next_crc32),UVM_LOW)      
-      end
-      
-      for(int i = 3;i >= 0;i--)
-        frame_q[idx++] = next_crc32[8*i +: 8]; 
-      
-      // Print full frame format always
-      $display("*****************************ETH_DRIVER***********************************");
-      `uvm_info("DRIVER PACKING", $sformatf("\n\t preamble = %p\n\t sfd = 0x%0h\n\t DA = %h\n\t SA = %h\n\t ether_type = 0x%0h\n\t payload = %h bytes\n\t crc = 0x%h\n\t Total frame size = %0d, Frame size from DA = %0d\n\t Payload size = %0d\n\n\t VLAN_EN = %b\n\t VLAN_TPID = %h\n\t PCP = %h, DEI = %h, VID = %h",tr.preamble, tr.sfd, tr.da, tr.sa,tr.ether_type, tr.payload.size(), next_crc32,idx,idx - 8,tr.payload.size(),tr.vlan_en, tr.TPID, tr.PCP,tr.DEI,tr.VID), UVM_LOW)
-      
-      `uvm_info("DRIVING DATA", $sformatf("Frame size = %0d, CRC = %h",idx,next_crc32),UVM_LOW);
+    end
+    
+    //CRC packing
+    next_crc32 = 32'hFFFFFFFF;
+    for(int i = 0;i < idx;i++) begin
+      if(i > 7) //Avoiding the Preamble and SFD Bytes
+        next_crc32 = tr.crc_32(next_crc32, frame_q[i]);
+    end
+    
+    next_crc32 = ~next_crc32;
+    
+    //BAD FCS
+    if(tr.corrupt_fcs_en == 1) begin
+      next_crc32[7:0] = ~next_crc32[7:0];
+      `uvm_info("BAD FCS",$sformatf(" Transmitting Incorrect CRC = %h",next_crc32),UVM_LOW)      
+    end
+    
+    for(int i = 3;i >= 0;i--)
+      frame_q[idx++] = next_crc32[8*i +: 8]; 
+    
+    // Print full frame format always
+    $display("*****************************ETH_DRIVER***********************************");
+    `uvm_info("DRIVER PACKING", $sformatf("\n\t preamble = %p\n\t sfd = 0x%0h\n\t DA = %h\n\t SA = %h\n\t ether_type = 0x%0h\n\t payload = %h bytes\n\t crc = 0x%h\n\t Total frame size = %0d, Frame size from DA = %0d\n\t Payload size = %0d\n\n\t VLAN_EN = %b\n\t VLAN_TPID = %h\n\t PCP = %h, DEI = %h, VID = %h",tr.preamble, tr.sfd, tr.da, tr.sa,tr.ether_type, tr.payload.size(), next_crc32,idx,idx - 8,tr.payload.size(),tr.vlan_en, tr.TPID, tr.PCP,tr.DEI,tr.VID), UVM_LOW)
+    
+    `uvm_info("DRIVING DATA", $sformatf("Frame size = %0d, CRC = %h",idx,next_crc32),UVM_LOW);
   endtask
     
 endclass

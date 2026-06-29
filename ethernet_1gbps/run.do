@@ -82,8 +82,7 @@ set valid_tests {
     gmii_eth_ipg_violation_test
     gmii_eth_len_payload_mismat_test
     gmii_eth_normal_payload_padding_test
-    gmii_eth_vlan_payload_padding_test
-    gmii_eth_pfc_frame_test
+    gmii_eth_vlan_payload_padding_test 
     gmii_eth_collision_in_middle_bytes_test
     gmii_eth_broadcast_frame_test
     gmii_eth_jabber_frame_test
@@ -97,6 +96,11 @@ set valid_tests {
     gmii_eth_late_collision_test
     gmii_eth_long_frame_test
     gmii_eth_frame_bursting_test
+    gmii_eth_pfc_frame_test
+    gmii_eth_pfc_independent_timer_overlap_test
+    gmii_eth_pfc_with_random_priority_quanta_expiry_test
+    gmii_eth_pause_pfc_simultaneous_operation_test
+    gmii_eth_xoff_xon_back_to_back_pfc_test
 }
 # ==========================================
 # Check whether test is valid

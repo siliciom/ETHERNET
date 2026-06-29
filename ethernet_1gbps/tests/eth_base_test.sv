@@ -543,39 +543,6 @@ class gmii_eth_vlan_payload_padding_test extends eth_base_test;
   
 endclass
 
-
-class gmii_eth_pfc_frame_test extends eth_base_test;
-  `uvm_component_utils(gmii_eth_pfc_frame_test)
-  
-  function new (string name = "gmii_eth_pfc_frame_test", uvm_component parent = null);
-    super.new(name,parent);
-  endfunction
-
-  function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-  endfunction    
-  
-  task run_phase(uvm_phase phase);
-    virtual_seq vseq;
-    
-    phase.raise_objection(this); 
-   
-    vseq = virtual_seq::type_id::create("vseq");
-    vseq.pfc_with_vlan_traffic =1;
-    vseq.no_of_pkts = no_of_pkts;
-    vseq.basic_pfc_en = 1;
-    vseq.payload_rand_en = 0;
-    vseq.ether_type = 46;
-    vseq.vlan_en=1;
-    vseq.start(env_h.vseqr_h);
-    #100;
-    phase.drop_objection(this);
-     
-  endtask    
-endclass
-
-
-
 class gmii_eth_collision_in_middle_bytes_test extends eth_base_test;
   `uvm_component_utils(gmii_eth_collision_in_middle_bytes_test)
   
@@ -963,4 +930,151 @@ class gmii_eth_frame_bursting_test extends eth_base_test;
     phase.drop_objection(this);
   endtask  
 
+endclass
+
+class gmii_eth_pfc_frame_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_pfc_frame_test)
+  
+  function new (string name = "gmii_eth_pfc_frame_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this); 
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.pfc_with_vlan_traffic =1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.basic_pfc_en = 1;
+    vseq.payload_rand_en = 0;
+    vseq.ether_type = 46;
+    vseq.vlan_en=1;
+    vseq.start(env_h.vseqr_h);
+    phase.phase_done.set_drain_time(this,1000);
+    phase.drop_objection(this);
+     
+  endtask    
+endclass
+
+class gmii_eth_pfc_with_random_priority_quanta_expiry_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_pfc_with_random_priority_quanta_expiry_test)
+  
+  function new (string name = "gmii_eth_pfc_with_random_priority_quanta_expiry_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this); 
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.pfc_with_vlan_traffic =1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.pfc_rand_pri_en = 1;
+    vseq.payload_rand_en = 0;
+    vseq.ether_type = 46;
+    vseq.vlan_en=1;
+    vseq.start(env_h.vseqr_h);
+    phase.phase_done.set_drain_time(this,1500);
+    phase.drop_objection(this);
+     
+  endtask    
+endclass
+
+class gmii_eth_pause_pfc_simultaneous_operation_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_pause_pfc_simultaneous_operation_test)
+  
+  function new (string name = "gmii_eth_pause_pfc_simultaneous_operation_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this); 
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.pfc_with_vlan_traffic =1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.pfc_simul_en = 1;
+    vseq.payload_rand_en = 0;
+    vseq.ether_type = 46;
+    vseq.vlan_en=1;
+    vseq.start(env_h.vseqr_h);
+    phase.phase_done.set_drain_time(this,200);
+    phase.drop_objection(this);
+     
+  endtask    
+endclass
+
+class gmii_eth_pfc_independent_timer_overlap_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_pfc_independent_timer_overlap_test)
+  
+  function new (string name = "gmii_eth_pfc_independent_timer_overlap_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    
+    phase.raise_objection(this); 
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.pfc_with_vlan_traffic =1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.pfc_overlap_en = 1;
+    vseq.payload_rand_en = 0;
+    vseq.ether_type = 46;
+    vseq.vlan_en=1;
+    vseq.start(env_h.vseqr_h);
+    #100;
+    phase.drop_objection(this);
+     
+  endtask    
+endclass
+
+class gmii_eth_xoff_xon_back_to_back_pfc_test extends eth_base_test;
+  `uvm_component_utils(gmii_eth_xoff_xon_back_to_back_pfc_test)
+  function new (string name = "gmii_eth_xoff_xon_back_to_back_pfc_test", uvm_component parent = null);
+    super.new(name,parent);
+  endfunction
+ 
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction    
+  task run_phase(uvm_phase phase);
+    virtual_seq vseq;
+    phase.raise_objection(this); 
+    vseq = virtual_seq::type_id::create("vseq");
+    vseq.mode = 1;
+    vseq.vlan_en=1;
+    vseq.pfc_with_vlan_traffic =1;
+    vseq.back_to_back_xoff_xon_en= 1;
+    vseq.no_of_pkts = no_of_pkts;
+    vseq.basic_pfc_en = 0;
+    vseq.payload_rand_en = 0;
+    vseq.ether_type = 46;
+    vseq.start(env_h.vseqr_h);
+    phase.phase_done.set_drain_time(this,200);
+    phase.drop_objection(this);
+  endtask    
 endclass

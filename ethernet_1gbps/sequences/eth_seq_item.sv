@@ -7,6 +7,7 @@ class eth_seq_item extends uvm_sequence_item;
   rand bit [15:0] ether_type;
   rand bit [7:0] payload[];
   bit [31:0] crc;
+  bit [31:0] crc_residue;
   bit [47:0] mac_addr[`NO_OF_AGENTS];
   bit multi_mac_addr[`NO_OF_AGENTS][bit [47:0]];
   bit mode;
