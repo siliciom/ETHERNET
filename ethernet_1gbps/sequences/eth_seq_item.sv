@@ -1,5 +1,4 @@
 class eth_seq_item extends uvm_sequence_item;
-
   rand bit [7:0] preamble[7];
   rand bit [7:0] sfd;
   rand bit [47:0] da;
@@ -91,7 +90,6 @@ class eth_seq_item extends uvm_sequence_item;
   constraint addr{ da inside {mac_addr};};
   constraint sa_da_not_match{ da != sa ;};
   constraint vlan_tpid{ vlan_en == 1 -> TPID == 16'h8100;};
-
 endclass
 
 

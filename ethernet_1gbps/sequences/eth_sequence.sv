@@ -13,12 +13,13 @@ class base_seq extends uvm_sequence #(eth_seq_item);
   bit [15:0] pause_opc;
   bit [15:0] pause_time; 
   bit corrupt_preamble_en;
-  bit corrupt_fcs_en;
+  bit runt_bad_en;
   static int trans_count;
   bit custom_da;
   bit [11:0] VID;
   bit invld_length_en;
   bit send_runt;
+  bit runt_en;
   bit len_payload_mismat_en; 
   bit corrupt_ipg_en;
   int pkt_no;
@@ -44,6 +45,7 @@ class base_seq extends uvm_sequence #(eth_seq_item);
   bit pfc_rand_pri_en;
   bit force_pcp_en;
   bit [2:0]force_pcp;
+  bit corrupt_fcs_en;
   
   function new (string name = "base_seq");
     super.new(name);
@@ -66,6 +68,10 @@ class gmii_eth_normal_frame_seq extends base_seq;
     start_item(req);
     trans_count++;
     exact_pkt = find_no(trans_count);
+    if(this.runt_en == 1) begin
+      c_ether_type = $urandom_range(0,45);
+    end
+
     if(this.invld_length_en == 1)
       c_ether_type = $urandom_range(1501, 1536);
     if(this.padding_en == 1)
@@ -76,6 +82,7 @@ class gmii_eth_normal_frame_seq extends base_seq;
       else
         req.randomize() with {sa == p_sequencer.mac_addr;       
                               ether_type == c_ether_type;};  
+      
       req.mode = mode;
       req.middle_coll_en = middle_coll_en;
       req.max_coll_en = max_coll_en;
@@ -149,13 +156,12 @@ class gmii_eth_normal_frame_seq extends base_seq;
        req.preamble[pkt_no] = 8'hFF;
        `uvm_info("PREAMBLE CORRUPT", $sformatf("Sending Corrupted Preamble in Byte = %0d, Transaction no = %0d",pkt_no,exact_pkt),UVM_LOW)
      end
-     //CORRUPT FCS
-     if(this.corrupt_fcs_en == 1) begin
-       req.corrupt_fcs_en = 1;
-       `uvm_info("CORRUPT FCS TX",$sformatf("Sending bad fcs in Transaction = %0d",exact_pkt),UVM_LOW)
-     end
-     else
-       req.corrupt_fcs_en = 0;
+      //CORRUPT FCS
+      if(this.corrupt_fcs_en == 1) begin
+          req.corrupt_fcs_en = 1;
+          `uvm_info("CORRUPT FCS TX",$sformatf("Sending bad fcs in Transaction = %0d",exact_pkt),UVM_LOW)
+      end else
+        req.corrupt_fcs_en = 0;
      //CORRUPT IPG
      if(this.corrupt_ipg_en == 1) begin        
        req.ipg_cnt = $urandom_range(1,11);

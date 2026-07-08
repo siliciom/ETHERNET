@@ -7,6 +7,7 @@
   `include "../sequences/eth_seq_item.sv"
   
 
+  `include "../agents/eth_callback.sv"
   `include "../agents/eth_mon.sv"
   `include "../agents/eth_drv.sv"
   `include "../agents/eth_seqr.sv"
@@ -15,6 +16,8 @@
   `include "../env/eth_virtual_seqr.sv"
   `include "../env/eth_sbscr.sv"
   `include "../env/eth_scb.sv"
+  `include "../env/eth_pfc_checker.sv"
+  `include "../env/eth_pause_checker.sv"
   `include "../env/eth_env.sv"
 
   `include "../sequences/eth_sequence.sv"
