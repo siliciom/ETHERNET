@@ -3,7 +3,7 @@ class eth_base_test extends uvm_test;
 
   eth_env env_h;
   virtual_seq v_seq;
-  int no_of_pkts = 100;
+  int no_of_pkts = 1000;
   function new(string name = "eth_base_test", uvm_component parent = null);
     super.new(name,parent);
   endfunction
