@@ -11,9 +11,16 @@ if {[file exists work]} {
 if {![info exists regression_name]} {
     set regression_name "default_regression"
 }
+
+#========================================================
+# COVERAGE ENABLE/DISABLE
+#========================================================
+if {![info exists enable_cov]} {
+    set enable_cov 0
+}
  
 #========================================================
-# TEST LIST
+# TEST LIST (Add all the Tests)
 #========================================================
 set test_list {
 
@@ -37,8 +44,17 @@ set test_list {
     gmii_eth_simultaneous_pause_frame_test
     gmii_eth_pause_reserved_opcode_test
     gmii_eth_pause_frame_with_upadated_pause_time
+    gmii_eth_pause_frame_during_vlan_traffic_test
     gmii_eth_long_frame_test
-
+    gmii_eth_consec_multiple_same_pfc_xoff_imd_xon_test
+    gmii_eth_consec_multiple_diff_pfc_xoff_imd_xon_test
+    gmii_eth_jumbo_frame_test
+    gmii_eth_pfc_multiple_priority_xoff_overlap_test
+    gmii_eth_xoff_xon_back_to_back_pfc_test
+    gmii_eth_pause_pfc_simultaneous_operation_test
+    gmii_eth_pfc_with_random_priority_quanta_expiry_test
+    gmii_eth_pfc_independent_timer_overlap_test
+    gmii_eth_pfc_frame_test
 
     gmii_eth_frame_with_ext_bit_test
     gmii_eth_frame_bursting_test
@@ -48,6 +64,7 @@ set test_list {
     gmii_eth_late_collision_test
     gmii_eth_multicast_frame_test
     gmii_eth_broadcast_frame_test
+    gmii_eth_mac2_mac3_addr_cov_test
     }
 
 
@@ -57,7 +74,7 @@ set test_list {
 proc check_result {logfile testname} {
 
     if {![file exists $logfile]} {
-        puts "FAILED : $testname (log file not found)"
+        puts "FAILED : $testname (Log file not found)"
         return "FAIL"
     }
 
@@ -65,29 +82,31 @@ proc check_result {logfile testname} {
     set content [read $fh]
     close $fh
 
-    set fatal_count 0
+    #--------------------------------------------------
+    # Check UVM Summary
+    #--------------------------------------------------
     set error_count 0
+    set fatal_count 0
 
-    foreach line [split $content "\n"] {
-
-        if {[regexp {Number of FATAL reports\s*:\s*(\d+)} $line -> count]} {
-            set fatal_count $count
-        }
-
-        if {[regexp {Number of ERROR reports\s*:\s*(\d+)} $line -> count]} {
-            set error_count $count
-        }
+    if {[regexp {UVM_ERROR\s*:\s*([0-9]+)} $content -> error_count]} {
+        # Found UVM_ERROR count
     }
 
-    if {$fatal_count == 0 && $error_count == 0} {
-        puts "PASSED : $testname"
-        return "PASS"
-    } else {
-        puts "FAILED : $testname (FATAL=$fatal_count ERROR=$error_count)"
+    if {[regexp {UVM_FATAL\s*:\s*([0-9]+)} $content -> fatal_count]} {
+        # Found UVM_FATAL count
+    }
+
+    if {$error_count > 0 || $fatal_count > 0} {
+
+        puts "FAILED : $testname (UVM_ERROR=$error_count UVM_FATAL=$fatal_count)"
+
         return "FAIL"
     }
-}
- 
+
+    puts "PASSED : $testname"
+
+    return "PASS"
+} 
 #========================================================
 # REGRESSION LOOP
 #========================================================
@@ -99,7 +118,7 @@ set last_comp_opts "__NONE__"
 foreach testname $test_list {
 
 #=========================================
-# Seed Handling
+# Seed Handling (Picks Random Seed)
 #=========================================
 set seed [expr {int(rand()*1000000)}]
 
@@ -165,9 +184,11 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     set comp_opts "+define+HALF_DUPLEX"
 
+} elseif {$testname == "gmii_eth_mac2_mac3_addr_cov_test"} {
+
+    set comp_opts "+define+NO_OF_AGENTS=4"
+
 }
-
-
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
     puts "RUN_OPTS  : $run_opts" 
@@ -187,6 +208,7 @@ set complog "$test_dir/comp.log"
 #====================================================
 # COMPILE
 #====================================================
+
 if {$comp_opts ne $last_comp_opts} {
 
     puts "================================="
@@ -195,43 +217,99 @@ if {$comp_opts ne $last_comp_opts} {
     puts "COMP_OPTS : <$comp_opts>"
     puts "================================="
 
-            eval vlog -work work -cover bsectf +fcover -sv -incr -mfcu \
-                top/eth_gmii_interface.sv \
-                top/eth_ui_interface.sv \
-                top/eth_top.sv \
-    		$comp_opts 
-		set last_comp_opts $comp_opts
+    if {$enable_cov} {
+        set cov_compile_opts "-cover bsectf +fcover"
+    } else {
+        set cov_compile_opts ""
+    }
+
+    transcript file $complog
+
+    set comp_status [catch {
+
+        eval vlog -work work $cov_compile_opts -sv -incr -mfcu \
+            top/eth_gmii_interface.sv \
+            top/eth_ui_interface.sv \
+            top/eth_top.sv \
+            $comp_opts
+
+    } comp_result]
+
+    transcript file ""
+
+    if {$comp_status != 0} {
+
+        puts "COMPILE FAILED : $testname"
+        puts $comp_result
+
+        incr fail_count
+        lappend fail_list $testname
+
+        continue
+    }
+
+    set last_comp_opts $comp_opts
+
 } else {
+
     puts "================================="
     puts "SKIPPING COMPILE"
     puts "TEST      : $testname"
     puts "COMP_OPTS : <$comp_opts>"
     puts "================================="
 }
+	
+if {$enable_cov} {
+	set cov_dir "./coverage_reports/$regression_name"
  
- 
-set cov_dir "./coverage_reports/$regression_name"
 file mkdir $cov_dir
 set ucdb_file "$cov_dir/$testname.ucdb"
+}
+
  
-    #====================================================
-    # SIMULATION COMMAND
-    #====================================================
-catch {
+#====================================================
+# SIMULATION
+#====================================================
+
+set sim_cov_opts ""
+
+if {$enable_cov} {
+
+    set sim_cov_opts "-coverage -cvgperinstance"
+
+    set do_cmd \
+        "coverage save -onexit $ucdb_file; run -all; quit -f"
+
+} else {
+
+    set do_cmd "run -all; quit -f"
+}
+
+set sim_status [catch {
+
     exec vsim -c \
-        -coverage \
-        -cvgperinstance \
+        {*}$sim_cov_opts \
         -debugDB \
-        -batch \
-        +acc \
+        -voptargs=+acc \
         work.eth_top \
         +UVM_TESTNAME=$testname \
         -l $logfile \
         -sv_seed $seed \
         $run_opts \
-        -do "coverage save -onexit $ucdb_file; run -all; quit -f"
-} sim_result
- 
+        -do "$do_cmd"
+
+} sim_result]
+
+if {$sim_status != 0} {
+
+    puts "ELAB/SIM FAILED : $testname"
+    puts $sim_result
+
+    incr fail_count
+    lappend fail_list $testname
+
+    continue
+}
    #====================================================
     # CHECK PASS / FAIL
     #====================================================
@@ -250,6 +328,9 @@ catch {
 #========================================================
 # SHOW GENERATED UCDB FILES
 #========================================================
+
+if {$enable_cov} {
+
 echo "======================================="
 echo "GENERATED COVERAGE FILES"
 echo "======================================="
@@ -299,6 +380,7 @@ vcover report \
 #========================================================
 # FINAL REGRESSION SUMMARY
 #========================================================
+}
 echo "======================================="
 echo "        REGRESSION SUMMARY"
 echo "======================================="
@@ -325,11 +407,13 @@ echo "======================================="
 quit -f
 
 
+
 #======================================================================================================
 #======================================================================================================
 
 # Regression Run Command: vsim -c -do .\regression.do
 # Regression Run Command with regr_name:  vsim -c -do "set regression_name march_regr; do regression.do"
+# Regression Run Command with regr_name and covergae enable: vsim -c -do "set regression_name regr_cov1; set enable_cov 1; do regression.do"
 
 # Logs Path: Regression/regression_name/test_name/run.log
 # Single Coverage Path: coverage_reports/regression_name/test_name.ucdb
@@ -338,3 +422,6 @@ quit -f
 
 #======================================================================================================
 #======================================================================================================
+
+
+
