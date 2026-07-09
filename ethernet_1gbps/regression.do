@@ -36,7 +36,7 @@ set test_list {
     gmii_eth_invalid_dest_addr_test
     gmii_eth_normal_frame_undefined_length_test
     gmii_eth_ipg_violation_test
-    gmii_eth_len_payload_mismat_test
+    gmii_eth_len_payload_mismatch_test
     gmii_eth_normal_payload_padding_test
     gmii_eth_vlan_payload_padding_test
     gmii_eth_jabber_frame_test
@@ -48,14 +48,14 @@ set test_list {
     gmii_eth_long_frame_test
     gmii_eth_consec_multiple_same_pfc_xoff_imd_xon_test
     gmii_eth_consec_multiple_diff_pfc_xoff_imd_xon_test
-    gmii_eth_jumbo_frame_test
-    gmii_eth_pfc_multiple_priority_xoff_overlap_test
+    gmii_eth_pfc_multiple_priority_xoff_test
     gmii_eth_xoff_xon_back_to_back_pfc_test
-    gmii_eth_pause_pfc_simultaneous_operation_test
+    gmii_eth_pfc_simultaneous_operation_test
     gmii_eth_pfc_with_random_priority_quanta_expiry_test
     gmii_eth_pfc_independent_timer_overlap_test
     gmii_eth_pfc_frame_test
 
+    gmii_eth_jumbo_frame_test
     gmii_eth_frame_with_ext_bit_test
     gmii_eth_frame_bursting_test
     gmii_eth_collision_detect_test
@@ -65,7 +65,7 @@ set test_list {
     gmii_eth_multicast_frame_test
     gmii_eth_broadcast_frame_test
     gmii_eth_mac2_mac3_addr_cov_test
-    }
+}
 
 
 #========================================================

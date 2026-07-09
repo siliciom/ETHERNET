@@ -73,7 +73,7 @@ class gmii_eth_normal_frame_seq extends base_seq;
     end
 
     if(this.invld_length_en == 1)
-      c_ether_type = $urandom_range(1501, 1536);
+      c_ether_type = $urandom_range(1501, 1535);
     if(this.padding_en == 1)
       req.padding_en = 1;
       // Complete frame fields from preamble to payload will be generated
