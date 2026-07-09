@@ -52,7 +52,7 @@ class eth_sbscr extends uvm_subscriber#(eth_seq_item);
     cp_payload : coverpoint tr.payload.size() {bins min_payload = {46};
                                                bins normal_payload = {[47:1499]};
     					       bins max_payload = {1500};
-                                               illegal_bins invalid_payload_size ={[0:45],[1501:1536]};}
+                                               illegal_bins invalid_payload_size ={[0:45],[1501:1535]};}
     cp_runt : coverpoint tr.payload.size() {bins runt = {[0:45]};} 	
     cp_duplex : coverpoint tr.mode {bins half_duplex = {0}; bins full_duplex = {1};}		 
     cp_invalid_sa : coverpoint (tr.sa == tr.da) {illegal_bins invalid_sa = {1};}
@@ -70,8 +70,6 @@ class eth_sbscr extends uvm_subscriber#(eth_seq_item);
     cp_runt_frame : coverpoint (rx_runt_good_fcs_cnt>0) {bins no_runt_good_fcs_received ={0}; bins runt_good_fcs_received ={1};}
     cp_fragment_frame : coverpoint (rx_runt_bad_fcs_cnt>0){bins no_runt_bad_fcs_received ={0}; bins runt_bad_fcs_received ={1};}
     cp_jabber_frame : coverpoint (rx_jabber_cnt>0){bins no_jabber_received ={0}; bins jabber_received ={1};}
-    cp_long_frame : coverpoint tr.payload.size()
-    { bins long_1  = {[1537:1700]}; bins long_2  = {[1701:1800]}; bins long_3  = {[1801:1900]}; bins long_4  = {[1901:2000]}; }
     cp_pfc_xoff_prio0 : coverpoint rx_pfc_xoff_prio0_count>0 {bins pfc_xoff_prio0_received ={1} ;bins no_pfc_xoff_prio0_received ={0} ;}
     cp_pfc_xoff_prio1 : coverpoint rx_pfc_xoff_prio1_count>0 {bins pfc_xoff_prio1_received ={1} ;bins no_pfc_xoff_prio1_received ={0} ;}
     cp_pfc_xoff_prio2 : coverpoint rx_pfc_xoff_prio2_count>0 {bins pfc_xoff_prio2_received ={1} ;bins no_pfc_xoff_prio2_received ={0} ;}

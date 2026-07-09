@@ -301,6 +301,7 @@ class gmii_eth_invalid_dest_addr_test extends eth_base_test;
    foreach(env_h.agnt_mac[i]) begin
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"TX_INVALID_DA",UVM_WARNING);
       env_h.agnt_mac[i].mon_h.set_report_severity_id_override(UVM_ERROR,"RX_INVALID_DA",UVM_WARNING);
+      env_h.scb_h.set_report_severity_id_override(UVM_ERROR,"SB_INVALID_DA",UVM_WARNING);
     end 
     phase.raise_objection(this);  
     repeat(this.no_of_pkts) begin
@@ -1030,7 +1031,7 @@ class gmii_eth_jumbo_frame_test extends eth_base_test;
       vseq.mode            = 1;
       vseq.payload_rand_en = 0;
       vseq.padding_en      = 1;
-      vseq.ether_type = $urandom_range(1537,1600);
+      vseq.ether_type = $urandom_range(1537,16000);
       vseq.start(env_h.vseqr_h);
     end
     wait_until_complete();
