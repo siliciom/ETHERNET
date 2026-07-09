@@ -188,7 +188,12 @@ if {$testname == "gmii_eth_normal_frame_test"} {
 
     set comp_opts "+define+NO_OF_AGENTS=4"
 
+}  elseif {$testname == "gmii_eth_jumbo_frame_test"} {
+
+    set comp_opts "+define+JUMBO_EN"
+
 }
+
     puts "TEST      : $testname"
     puts "COMP_OPTS : $comp_opts"
     puts "RUN_OPTS  : $run_opts" 
